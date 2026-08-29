@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Comfee dishwasher",
+        "description": "Choose cloud discovery or enter the local LAN credentials manually.",
+        "menu_options": {
+          "cloud": "Discover with MSmartHome account",
+          "manual": "Enter local token and key"
+        }
+      },
+      "cloud": {
+        "title": "MSmartHome account",
+        "description": "The account is used only during setup to obtain the local device key. It is not saved in the config entry.",
+        "data": {
+          "account": "Email or account",
+          "password": "Password",
+          "ip_address": "Dishwasher IP (optional)"
+        }
+      },
+      "select_device": {
+        "title": "Select dishwasher",
+        "description": "Select the dishwasher to add.",
+        "data": {
+          "device": "Device"
+        }
+      },
+      "manual": {
+        "title": "Local dishwasher credentials",
+        "description": "Use hexadecimal token and key values obtained from MSmartHome.",
+        "data": {
+          "device_id": "Device ID",
+          "ip_address": "IP address",
+          "port": "TCP port",
+          "protocol": "Protocol version",
+          "model": "Model",
+          "name": "Name",
+          "token": "Token",
+          "key": "Key"
+        }
+      }
+    },
+    "error": {
+      "cloud_login_failed": "MSmartHome login failed.",
+      "device_not_found": "No E1 dishwasher was found on the local network.",
+      "device_not_in_account": "The discovered dishwasher is not present in this MSmartHome account.",
+      "device_auth_failed": "The device was found, but no local key could authenticate it.",
+      "invalid_token": "Token and key must be non-empty hexadecimal values.",
+      "manual_auth_failed": "The local credentials did not authenticate the dishwasher.",
+      "setup_failed": "The dishwasher setup failed. Check the account, network and device state."
+    },
+    "abort": {
+      "already_configured": "This dishwasher is already configured."
+    }
+  }
+}

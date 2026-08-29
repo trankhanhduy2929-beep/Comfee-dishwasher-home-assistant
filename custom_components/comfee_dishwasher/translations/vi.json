@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Máy rửa bát Comfee",
+        "description": "Chọn tự dò bằng tài khoản cloud hoặc nhập thông tin LAN thủ công.",
+        "menu_options": {
+          "cloud": "Tự dò bằng tài khoản MSmartHome",
+          "manual": "Nhập token và key LAN"
+        }
+      },
+      "cloud": {
+        "title": "Tài khoản MSmartHome",
+        "description": "Tài khoản chỉ được dùng trong lúc cài đặt để lấy key nội bộ. Mật khẩu không được lưu trong config entry.",
+        "data": {
+          "account": "Email hoặc tài khoản",
+          "password": "Mật khẩu",
+          "ip_address": "IP máy rửa bát (không bắt buộc)"
+        }
+      },
+      "select_device": {
+        "title": "Chọn máy rửa bát",
+        "description": "Chọn máy cần thêm vào Home Assistant.",
+        "data": {
+          "device": "Thiết bị"
+        }
+      },
+      "manual": {
+        "title": "Thông tin LAN máy rửa bát",
+        "description": "Nhập token và key dạng hexadecimal lấy từ phiên MSmartHome được ủy quyền.",
+        "data": {
+          "device_id": "Device ID",
+          "ip_address": "Địa chỉ IP",
+          "port": "Cổng TCP",
+          "protocol": "Phiên bản giao thức",
+          "model": "Model",
+          "name": "Tên",
+          "token": "Token",
+          "key": "Key"
+        }
+      }
+    },
+    "error": {
+      "cloud_login_failed": "Đăng nhập MSmartHome thất bại.",
+      "device_not_found": "Không tìm thấy máy rửa bát E1 trong mạng LAN.",
+      "device_not_in_account": "Máy rửa bát tìm thấy không thuộc tài khoản MSmartHome này.",
+      "device_auth_failed": "Đã tìm thấy thiết bị nhưng không có key nào xác thực được.",
+      "invalid_token": "Token và key phải là chuỗi hexadecimal không rỗng.",
+      "manual_auth_failed": "Thông tin LAN không xác thực được máy rửa bát.",
+      "setup_failed": "Cài đặt thất bại. Hãy kiểm tra tài khoản, mạng và trạng thái thiết bị."
+    },
+    "abort": {
+      "already_configured": "Máy rửa bát này đã được cấu hình."
+    }
+  }
+}
