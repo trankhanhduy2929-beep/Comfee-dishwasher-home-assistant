@@ -2,13 +2,13 @@
 
 from hashlib import sha256
 from pathlib import Path
-from zipfile import ZIP_DEFLATED, ZipFile
-
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parent
 COMPONENT = ROOT / "custom_components" / "comfee_dishwasher"
 OUTPUT = ROOT / "dist" / "comfee_dishwasher.zip"
 CHECKSUM = ROOT / "dist" / "comfee_dishwasher.zip.sha256"
+ARCHIVE_TIMESTAMP = (2020, 1, 1, 0, 0, 0)
 
 
 def main() -> None:
@@ -19,7 +19,10 @@ def main() -> None:
             if not path.is_file() or "__pycache__" in path.parts:
                 continue
             archive_name = Path("comfee_dishwasher") / path.relative_to(COMPONENT)
-            archive.write(path, archive_name.as_posix())
+            info = ZipInfo(archive_name.as_posix(), ARCHIVE_TIMESTAMP)
+            info.compress_type = ZIP_DEFLATED
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, path.read_bytes())
     digest = sha256(OUTPUT.read_bytes()).hexdigest()
     CHECKSUM.write_text(f"{digest}  {OUTPUT.name}\n", encoding="ascii")
     OUTPUT.chmod(0o644)

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import tempfile
 from datetime import UTC, datetime
 from hashlib import sha256
-import json
 from pathlib import Path
-import tempfile
 from types import MappingProxyType
 from unittest import IsolatedAsyncioTestCase, TestCase
 from unittest.mock import AsyncMock, Mock, patch
@@ -25,14 +25,19 @@ from homeassistant.const import (
     CONF_TYPE,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from midealocal.devices.e1 import MideaE1Device
 
+import build_component
 from custom_components.comfee_dishwasher import (
     async_setup_entry,
     async_unload_entry,
+    binary_sensor,
     button,
     config_flow,
     select,
+    sensor,
+    switch,
 )
 from custom_components.comfee_dishwasher.const import (
     CONF_ACCOUNT,
@@ -40,10 +45,11 @@ from custom_components.comfee_dishwasher.const import (
     CONF_SUBTYPE,
     DOMAIN,
     MODE_NAMES,
+    WRITABLE_ATTRIBUTES,
 )
-
-import build_component
-
+from custom_components.comfee_dishwasher.coordinator import (
+    ComfeeDishwasherCoordinator,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "comfee_dishwasher"
@@ -55,10 +61,14 @@ class ComponentContractTests(TestCase):
     def test_manifest_contract(self) -> None:
         manifest = json.loads((COMPONENT / "manifest.json").read_text())
         self.assertEqual(manifest["domain"], "comfee_dishwasher")
-        self.assertEqual(manifest["version"], "0.2.0")
+        self.assertEqual(manifest["version"], "0.3.0")
         self.assertEqual(manifest["requirements"], ["midea-local==10.0.1"])
         self.assertEqual(manifest["iot_class"], "local_polling")
         self.assertTrue(manifest["config_flow"])
+
+        hacs = json.loads((ROOT / "hacs.json").read_text())
+        self.assertTrue(hacs["zip_release"])
+        self.assertEqual(hacs["filename"], "comfee_dishwasher.zip")
 
     def test_translation_contract(self) -> None:
         strings = json.loads((COMPONENT / "strings.json").read_text())
@@ -75,6 +85,36 @@ class ComponentContractTests(TestCase):
                 {"cloud", "manual"},
             )
 
+    def test_entity_translations_are_complete(self) -> None:
+        """Every exposed entity and enum state has both translations."""
+        descriptions = {
+            "binary_sensor": binary_sensor.BINARY_SENSOR_DESCRIPTIONS,
+            "button": (
+                button.ComfeeDishwasherStartButton.entity_description,
+                button.ComfeeDishwasherRefreshButton.entity_description,
+                button.ComfeeDishwasherReconnectButton.entity_description,
+            ),
+            "select": (select.ComfeeDishwasherSelect.entity_description,),
+            "sensor": sensor.SENSOR_DESCRIPTIONS,
+            "switch": switch.SWITCH_DESCRIPTIONS,
+        }
+        for language in ("en", "vi"):
+            translated = json.loads(
+                (COMPONENT / "translations" / f"{language}.json").read_text(),
+            )
+            for platform, platform_descriptions in descriptions.items():
+                entities = translated["entity"][platform]
+                for description in platform_descriptions:
+                    self.assertIn(description.translation_key, entities)
+                    self.assertIn("name", entities[description.translation_key])
+                    options = getattr(description, "options", None)
+                    if options:
+                        self.assertTrue(
+                            set(options).issubset(
+                                entities[description.translation_key]["state"],
+                            ),
+                        )
+
     def test_mode_table_matches_dependency(self) -> None:
         self.assertEqual(MODE_NAMES, MideaE1Device._modes)
 
@@ -85,6 +125,9 @@ class ComponentContractTests(TestCase):
         self.assertFalse(
             button.ComfeeDishwasherStartButton.entity_description.entity_registry_enabled_default,
         )
+
+    def test_only_verified_boolean_controls_are_writable(self) -> None:
+        self.assertEqual(WRITABLE_ATTRIBUTES, {"power", "child_lock", "storage"})
 
     def test_discovery_passes_single_ip_string(self) -> None:
         with patch.object(config_flow, "discover", return_value={}) as discover_mock:
@@ -139,6 +182,8 @@ class ComponentContractTests(TestCase):
         self.assertIn("comfee_dishwasher/manifest.json", names)
         self.assertIn("comfee_dishwasher/brand/icon.png", names)
         self.assertIn("comfee_dishwasher/brand/logo.png", names)
+        self.assertIn("comfee_dishwasher/icons.json", names)
+        self.assertIn("comfee_dishwasher/diagnostics.py", names)
         self.assertFalse(any("__pycache__" in name for name in names))
         self.assertFalse(any("credentials" in name.casefold() for name in names))
         self.assertTrue(all(name.startswith("comfee_dishwasher/") for name in names))
@@ -296,6 +341,53 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
             await entry._async_process_on_unload(self.hass)
             await self.hass.async_block_till_done()
         device.close_socket.assert_called_once_with()
+
+    async def test_unsupported_local_control_is_rejected(self) -> None:
+        entry = ConfigEntry(
+            created_at=datetime.now(UTC),
+            data=self._candidate(),
+            discovery_keys=MappingProxyType({}),
+            domain=DOMAIN,
+            minor_version=0,
+            modified_at=datetime.now(UTC),
+            options=None,
+            source="user",
+            state=ConfigEntryState.SETUP_IN_PROGRESS,
+            subentries_data=None,
+            title="Dishwasher",
+            unique_id="123456",
+            version=1,
+        )
+        device = Mock()
+        coordinator = ComfeeDishwasherCoordinator(self.hass, entry, device)
+        coordinator.data = {"power": True}
+        with self.assertRaises(HomeAssistantError):
+            await coordinator.async_set_attribute("uv", True)
+        device.set_attribute.assert_not_called()
+        await coordinator.async_shutdown()
+
+    async def test_cycle_guard_blocks_open_door(self) -> None:
+        entry = ConfigEntry(
+            created_at=datetime.now(UTC),
+            data=self._candidate(),
+            discovery_keys=MappingProxyType({}),
+            domain=DOMAIN,
+            minor_version=0,
+            modified_at=datetime.now(UTC),
+            options=None,
+            source="user",
+            state=ConfigEntryState.SETUP_IN_PROGRESS,
+            subentries_data=None,
+            title="Dishwasher",
+            unique_id="123456",
+            version=1,
+        )
+        device = Mock()
+        coordinator = ComfeeDishwasherCoordinator(self.hass, entry, device)
+        coordinator.data = {"power": True, "door": True, "status": "off"}
+        with self.assertRaises(HomeAssistantError):
+            coordinator._validate_cycle_command()
+        await coordinator.async_shutdown()
 
     async def test_setup_rediscovers_changed_ip(self) -> None:
         entry = ConfigEntry(

@@ -1,0 +1,107 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "door": {
+        "default": "mdi:dishwasher"
+      },
+      "rinse_aid": {
+        "default": "mdi:bottle-tonic"
+      },
+      "salt": {
+        "default": "mdi:shaker-outline"
+      },
+      "water_lack": {
+        "default": "mdi:water-alert"
+      },
+      "dry_status": {
+        "default": "mdi:heat-wave"
+      },
+      "storage_status": {
+        "default": "mdi:archive-clock"
+      },
+      "uv": {
+        "default": "mdi:creation"
+      },
+      "dry": {
+        "default": "mdi:weather-sunny"
+      },
+      "waterswitch": {
+        "default": "mdi:water-check"
+      },
+      "error_active": {
+        "default": "mdi:alert-circle"
+      },
+      "operation_warning": {
+        "default": "mdi:alert-outline"
+      },
+      "local_connection": {
+        "default": "mdi:lan-connect"
+      }
+    },
+    "button": {
+      "start": {
+        "default": "mdi:play"
+      },
+      "refresh": {
+        "default": "mdi:refresh"
+      },
+      "reconnect": {
+        "default": "mdi:lan-connect"
+      }
+    },
+    "select": {
+      "wash_program": {
+        "default": "mdi:dishwasher"
+      }
+    },
+    "sensor": {
+      "status": {
+        "default": "mdi:information-outline"
+      },
+      "mode": {
+        "default": "mdi:dishwasher"
+      },
+      "progress": {
+        "default": "mdi:progress-check"
+      },
+      "time_remaining": {
+        "default": "mdi:timer-outline"
+      },
+      "temperature": {
+        "default": "mdi:thermometer"
+      },
+      "humidity": {
+        "default": "mdi:water-percent"
+      },
+      "error_code": {
+        "default": "mdi:alert-box-outline"
+      },
+      "additional_code": {
+        "default": "mdi:code-tags"
+      },
+      "wrong_operation": {
+        "default": "mdi:alert-outline"
+      },
+      "rinse_aid_level": {
+        "default": "mdi:bottle-tonic"
+      },
+      "softwater_level": {
+        "default": "mdi:shaker-outline"
+      },
+      "storage_remaining": {
+        "default": "mdi:archive-clock"
+      }
+    },
+    "switch": {
+      "power": {
+        "default": "mdi:power"
+      },
+      "child_lock": {
+        "default": "mdi:lock"
+      },
+      "storage": {
+        "default": "mdi:archive-clock"
+      }
+    }
+  }
+}

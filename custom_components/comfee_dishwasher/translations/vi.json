@@ -52,5 +52,200 @@
     "abort": {
       "already_configured": "Máy rửa bát này đã được cấu hình."
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "door": {
+        "name": "Cửa máy rửa bát"
+      },
+      "rinse_aid": {
+        "name": "Thiếu chất trợ xả"
+      },
+      "salt": {
+        "name": "Thiếu muối rửa bát"
+      },
+      "water_lack": {
+        "name": "Thiếu nước"
+      },
+      "dry_status": {
+        "name": "Đang sấy"
+      },
+      "storage_status": {
+        "name": "Đang bảo quản / sấy khí"
+      },
+      "uv": {
+        "name": "Đã bật khử khuẩn UV"
+      },
+      "dry": {
+        "name": "Đã chọn chế độ sấy"
+      },
+      "waterswitch": {
+        "name": "Đang cấp nước"
+      },
+      "error_active": {
+        "name": "Đang có lỗi"
+      },
+      "operation_warning": {
+        "name": "Cảnh báo thao tác"
+      },
+      "local_connection": {
+        "name": "Kết nối mạng nội bộ LAN"
+      }
+    },
+    "button": {
+      "start": {
+        "name": "Khởi động chương trình hiện tại"
+      },
+      "refresh": {
+        "name": "Cập nhật trạng thái"
+      },
+      "reconnect": {
+        "name": "Kết nối lại qua LAN"
+      }
+    },
+    "select": {
+      "wash_program": {
+        "name": "Chọn chương trình và chạy",
+        "state": {
+          "none": "Chưa chọn",
+          "auto_wash": "Rửa tự động",
+          "strong_wash": "Rửa mạnh",
+          "standard_wash": "Rửa tiêu chuẩn",
+          "eco_wash": "Rửa tiết kiệm",
+          "glass_wash": "Rửa đồ thủy tinh",
+          "hour_wash": "Rửa hẹn giờ",
+          "fast_wash": "Rửa nhanh",
+          "soak_wash": "Ngâm / tráng",
+          "90min": "Rửa 90 phút",
+          "self_clean": "Tự vệ sinh",
+          "fruit_wash": "Rửa rau quả",
+          "self_define": "Chương trình tùy chỉnh",
+          "germ": "Rửa diệt khuẩn",
+          "bowl_wash": "Rửa bát tô",
+          "kill_germ": "Khử khuẩn",
+          "sea_food_wash": "Rửa hải sản",
+          "hot_pot_wash": "Rửa nồi lẩu",
+          "quiet_night_wash": "Rửa đêm yên tĩnh",
+          "less_wash": "Rửa nhẹ",
+          "oil_net_wash": "Rửa lưới lọc dầu",
+          "cloud_wash": "Rửa theo cloud"
+        }
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Trạng thái",
+        "state": {
+          "off": "Tắt",
+          "cancel": "Đã hủy",
+          "delay": "Đang hẹn giờ",
+          "running": "Đang chạy",
+          "error": "Lỗi",
+          "soft_gear": "Chế độ làm mềm nước"
+        }
+      },
+      "mode": {
+        "name": "Chương trình hiện tại",
+        "state": {
+          "none": "Chưa chọn",
+          "auto_wash": "Rửa tự động",
+          "strong_wash": "Rửa mạnh",
+          "standard_wash": "Rửa tiêu chuẩn",
+          "eco_wash": "Rửa tiết kiệm",
+          "glass_wash": "Rửa đồ thủy tinh",
+          "hour_wash": "Rửa hẹn giờ",
+          "fast_wash": "Rửa nhanh",
+          "soak_wash": "Ngâm / tráng",
+          "90min": "Rửa 90 phút",
+          "self_clean": "Tự vệ sinh",
+          "fruit_wash": "Rửa rau quả",
+          "self_define": "Chương trình tùy chỉnh",
+          "germ": "Rửa diệt khuẩn",
+          "bowl_wash": "Rửa bát tô",
+          "kill_germ": "Khử khuẩn",
+          "sea_food_wash": "Rửa hải sản",
+          "hot_pot_wash": "Rửa nồi lẩu",
+          "quiet_night_wash": "Rửa đêm yên tĩnh",
+          "less_wash": "Rửa nhẹ",
+          "oil_net_wash": "Rửa lưới lọc dầu",
+          "cloud_wash": "Rửa theo cloud"
+        }
+      },
+      "progress": {
+        "name": "Giai đoạn chương trình",
+        "state": {
+          "idle": "Chờ",
+          "pre_wash": "Tráng sơ",
+          "wash": "Rửa",
+          "rinse": "Xả",
+          "dry": "Sấy",
+          "complete": "Hoàn tất"
+        }
+      },
+      "time_remaining": {
+        "name": "Thời gian còn lại"
+      },
+      "temperature": {
+        "name": "Nhiệt độ nước"
+      },
+      "humidity": {
+        "name": "Độ ẩm bên trong"
+      },
+      "error_code": {
+        "name": "Mã lỗi"
+      },
+      "additional_code": {
+        "name": "Mã tùy chọn bổ sung"
+      },
+      "wrong_operation": {
+        "name": "Mã thao tác sai"
+      },
+      "rinse_aid_level": {
+        "name": "Mức chất trợ xả"
+      },
+      "softwater_level": {
+        "name": "Mức làm mềm nước"
+      },
+      "storage_remaining": {
+        "name": "Thời gian bảo quản / sấy khí còn lại"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Nguồn máy"
+      },
+      "child_lock": {
+        "name": "Khóa trẻ em"
+      },
+      "storage": {
+        "name": "Bảo quản / sấy khí"
+      }
+    }
+  },
+  "exceptions": {
+    "device_off": {
+      "message": "Hãy bật máy rửa bát trước khi khởi động chu trình."
+    },
+    "door_open": {
+      "message": "Hãy đóng cửa máy rửa bát trước khi chạy hoặc đổi chương trình."
+    },
+    "cycle_running": {
+      "message": "Máy rửa bát đang chạy."
+    },
+    "program_not_selected": {
+      "message": "Hãy chọn chương trình rửa trước khi khởi động."
+    },
+    "unsupported_control": {
+      "message": "Điều khiển này chưa được giao thức E1 cục bộ hỗ trợ."
+    },
+    "command_failed": {
+      "message": "Không thể gửi lệnh cục bộ đến máy rửa bát."
+    },
+    "local_connection_failed": {
+      "message": "Không thể kết nối máy rửa bát qua mạng nội bộ."
+    },
+    "unsupported_program": {
+      "message": "Chương trình rửa này không được máy hỗ trợ."
+    }
   }
 }

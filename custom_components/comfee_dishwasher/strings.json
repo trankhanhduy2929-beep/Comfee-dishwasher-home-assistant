@@ -52,5 +52,200 @@
     "abort": {
       "already_configured": "This dishwasher is already configured."
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "door": {
+        "name": "Door"
+      },
+      "rinse_aid": {
+        "name": "Rinse-aid shortage"
+      },
+      "salt": {
+        "name": "Dishwasher salt shortage"
+      },
+      "water_lack": {
+        "name": "Water shortage"
+      },
+      "dry_status": {
+        "name": "Drying"
+      },
+      "storage_status": {
+        "name": "Storage / air-dry active"
+      },
+      "uv": {
+        "name": "UV sterilization selected"
+      },
+      "dry": {
+        "name": "Drying option selected"
+      },
+      "waterswitch": {
+        "name": "Water inlet active"
+      },
+      "error_active": {
+        "name": "Error active"
+      },
+      "operation_warning": {
+        "name": "Operation warning"
+      },
+      "local_connection": {
+        "name": "Local LAN connection"
+      }
+    },
+    "button": {
+      "start": {
+        "name": "Start current program"
+      },
+      "refresh": {
+        "name": "Update status"
+      },
+      "reconnect": {
+        "name": "Reconnect over LAN"
+      }
+    },
+    "select": {
+      "wash_program": {
+        "name": "Select program and start",
+        "state": {
+          "none": "Not selected",
+          "auto_wash": "Auto wash",
+          "strong_wash": "Strong wash",
+          "standard_wash": "Standard wash",
+          "eco_wash": "Eco wash",
+          "glass_wash": "Glassware",
+          "hour_wash": "Timed wash",
+          "fast_wash": "Fast wash",
+          "soak_wash": "Soak / rinse",
+          "90min": "90-minute wash",
+          "self_clean": "Self-clean",
+          "fruit_wash": "Fruit and vegetable wash",
+          "self_define": "Custom program",
+          "germ": "Germ wash",
+          "bowl_wash": "Bowl wash",
+          "kill_germ": "Sterilization",
+          "sea_food_wash": "Seafood wash",
+          "hot_pot_wash": "Hot-pot wash",
+          "quiet_night_wash": "Quiet night wash",
+          "less_wash": "Gentle wash",
+          "oil_net_wash": "Oil-filter wash",
+          "cloud_wash": "Cloud wash"
+        }
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "off": "Off",
+          "cancel": "Canceled",
+          "delay": "Delayed",
+          "running": "Running",
+          "error": "Error",
+          "soft_gear": "Soft-water mode"
+        }
+      },
+      "mode": {
+        "name": "Current program",
+        "state": {
+          "none": "Not selected",
+          "auto_wash": "Auto wash",
+          "strong_wash": "Strong wash",
+          "standard_wash": "Standard wash",
+          "eco_wash": "Eco wash",
+          "glass_wash": "Glassware",
+          "hour_wash": "Timed wash",
+          "fast_wash": "Fast wash",
+          "soak_wash": "Soak / rinse",
+          "90min": "90-minute wash",
+          "self_clean": "Self-clean",
+          "fruit_wash": "Fruit and vegetable wash",
+          "self_define": "Custom program",
+          "germ": "Germ wash",
+          "bowl_wash": "Bowl wash",
+          "kill_germ": "Sterilization",
+          "sea_food_wash": "Seafood wash",
+          "hot_pot_wash": "Hot-pot wash",
+          "quiet_night_wash": "Quiet night wash",
+          "less_wash": "Gentle wash",
+          "oil_net_wash": "Oil-filter wash",
+          "cloud_wash": "Cloud wash"
+        }
+      },
+      "progress": {
+        "name": "Program stage",
+        "state": {
+          "idle": "Idle",
+          "pre_wash": "Pre-wash",
+          "wash": "Wash",
+          "rinse": "Rinse",
+          "dry": "Dry",
+          "complete": "Complete"
+        }
+      },
+      "time_remaining": {
+        "name": "Time remaining"
+      },
+      "temperature": {
+        "name": "Water temperature"
+      },
+      "humidity": {
+        "name": "Internal humidity"
+      },
+      "error_code": {
+        "name": "Error code"
+      },
+      "additional_code": {
+        "name": "Additional option code"
+      },
+      "wrong_operation": {
+        "name": "Wrong-operation code"
+      },
+      "rinse_aid_level": {
+        "name": "Rinse-aid level"
+      },
+      "softwater_level": {
+        "name": "Water-softener level"
+      },
+      "storage_remaining": {
+        "name": "Storage / air-dry time remaining"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Power"
+      },
+      "child_lock": {
+        "name": "Child lock"
+      },
+      "storage": {
+        "name": "Storage / air-dry"
+      }
+    }
+  },
+  "exceptions": {
+    "device_off": {
+      "message": "Turn on the dishwasher before starting a wash cycle."
+    },
+    "door_open": {
+      "message": "Close the dishwasher door before starting or changing a program."
+    },
+    "cycle_running": {
+      "message": "The dishwasher is already running."
+    },
+    "program_not_selected": {
+      "message": "Select a wash program before starting."
+    },
+    "unsupported_control": {
+      "message": "This control is not supported by the local E1 protocol."
+    },
+    "command_failed": {
+      "message": "The local command could not be sent to the dishwasher."
+    },
+    "local_connection_failed": {
+      "message": "The dishwasher could not be connected over the local network."
+    },
+    "unsupported_program": {
+      "message": "This wash program is not supported by the dishwasher."
+    }
   }
 }

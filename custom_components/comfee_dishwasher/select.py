@@ -4,9 +4,10 @@ from typing import Any
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import MODE_CODES
+from .const import DOMAIN, MODE_CODES
 from .coordinator import ComfeeDishwasherCoordinator
 from .entity import ComfeeDishwasherEntity
 
@@ -16,7 +17,7 @@ class ComfeeDishwasherSelect(ComfeeDishwasherEntity, SelectEntity):
 
     entity_description = SelectEntityDescription(
         key="wash_program",
-        name="Program and start",
+        translation_key="wash_program",
         options=list(MODE_CODES),
         entity_registry_enabled_default=False,
     )
@@ -39,7 +40,10 @@ class ComfeeDishwasherSelect(ComfeeDishwasherEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Select and start a program."""
         if option not in MODE_CODES:
-            raise ValueError(f"Unsupported dishwasher program: {option}")
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unsupported_program",
+            )
         await self.coordinator.async_set_mode(int(MODE_CODES[option]))
 
 

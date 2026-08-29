@@ -4,11 +4,6 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from midealocal.cloud import get_midea_cloud
-from midealocal.const import ProtocolVersion
-from midealocal.devices import device_selector
-from midealocal.discover import discover
-
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import (
     CONF_DEVICE_ID,
@@ -22,6 +17,10 @@ from homeassistant.const import (
     CONF_TYPE,
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from midealocal.cloud import get_midea_cloud
+from midealocal.const import ProtocolVersion
+from midealocal.devices import device_selector
+from midealocal.discover import discover
 
 from .const import (
     CONF_ACCOUNT,
@@ -187,7 +186,9 @@ class ComfeeDishwasherConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_DEVICE_ID): int,
                 vol.Required(CONF_IP_ADDRESS): str,
                 vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
-                vol.Optional(CONF_PROTOCOL, default=DEFAULT_PROTOCOL): vol.In([1, 2, 3]),
+                vol.Optional(CONF_PROTOCOL, default=DEFAULT_PROTOCOL): vol.In(
+                    [1, 2, 3]
+                ),
                 vol.Optional(CONF_MODEL, default="E1"): str,
                 vol.Optional(CONF_NAME, default="Comfee Dishwasher"): str,
                 vol.Required(CONF_TOKEN): str,

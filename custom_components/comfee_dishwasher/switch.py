@@ -13,21 +13,20 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .coordinator import ComfeeDishwasherCoordinator
 from .entity import ComfeeDishwasherEntity
 
-
 SWITCH_DESCRIPTIONS = (
     SwitchEntityDescription(
         key="power",
-        name="Power",
+        translation_key="power",
         device_class=SwitchDeviceClass.SWITCH,
     ),
     SwitchEntityDescription(
         key="child_lock",
-        name="Child lock",
+        translation_key="child_lock",
         device_class=SwitchDeviceClass.SWITCH,
     ),
     SwitchEntityDescription(
         key="storage",
-        name="Storage / air-dry",
+        translation_key="storage",
         device_class=SwitchDeviceClass.SWITCH,
     ),
 )

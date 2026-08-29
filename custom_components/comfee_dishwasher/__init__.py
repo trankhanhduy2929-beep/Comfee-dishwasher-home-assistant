@@ -3,11 +3,6 @@
 from collections.abc import Mapping
 from typing import Any
 
-from midealocal.const import ProtocolVersion
-from midealocal.device import MideaDevice
-from midealocal.devices import device_selector
-from midealocal.discover import discover
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_DEVICE_ID,
@@ -22,6 +17,10 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
+from midealocal.const import ProtocolVersion
+from midealocal.device import MideaDevice
+from midealocal.devices import device_selector
+from midealocal.discover import discover
 
 from .const import (
     CONF_KEY,

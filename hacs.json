@@ -1,5 +1,7 @@
 {
   "name": "Comfee Dishwasher",
   "homeassistant": "2026.3.0",
-  "hacs": "2.0.5"
+  "hacs": "2.0.5",
+  "zip_release": true,
+  "filename": "comfee_dishwasher.zip"
 }

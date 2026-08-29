@@ -24,6 +24,9 @@ gửi lệnh trực tiếp đến máy qua mạng nội bộ.
 Nhấn nút **Open in HACS** phía trên, chọn **Download**, sau đó restart Home
 Assistant.
 
+HACS sẽ lấy bản ZIP từ GitHub Release. Nếu repository chưa xuất hiện trong HACS,
+hãy thêm repository thủ công theo hướng dẫn dưới đây.
+
 ### Thêm repository thủ công
 
 1. Mở **HACS → Integrations**.
@@ -62,16 +65,37 @@ MSmartHome được ủy quyền hoặc từ cấu hình local đang hoạt đ�
 
 ## Entity
 
-- Trạng thái, chương trình, tiến độ, thời gian còn lại và nhiệt độ.
-- Cảm biến cửa, thiếu muối, thiếu nước, thiếu nước làm bóng và trạng thái sấy.
-- Chẩn đoán mã lỗi, độ ẩm, mức vật tư và thời gian storage/air-dry.
-- Switch nguồn, khóa trẻ em và storage/air-dry.
-- Select chương trình và nút start.
+- Trạng thái, chương trình hiện tại, giai đoạn rửa, thời gian còn lại và nhiệt độ nước.
+- Mức độ ẩm, mức chất trợ xả, mức làm mềm nước, thời gian bảo quản còn lại và mã chẩn đoán.
+- Cửa, thiếu chất trợ xả, thiếu muối, thiếu nước, sấy, bảo quản/sấy khí, UV và van cấp nước.
+- Cảnh báo lỗi/thao tác và trạng thái kết nối LAN để dùng trong automation.
+- Switch nguồn, khóa trẻ em và bảo quản/sấy khí; đây là ba lệnh ghi LAN đã được thư viện xác nhận.
+- Nút cập nhật trạng thái, kết nối lại LAN và nút khởi động chương trình hiện tại.
+- Select chương trình vẫn tắt mặc định vì một số firmware E1 chạy ngay khi chọn.
+
+Các entity mới chỉ đọc được tạo theo dữ liệu mà máy thực tế trả về. Vì vậy model
+E1 khác có thể có ít hoặc nhiều trạng thái hơn. Nút **Cập nhật trạng thái** và
+**Kết nối lại LAN** không gọi cloud và không gửi lệnh điều khiển máy.
 
 > [!CAUTION]
 > Với protocol E1, chọn một chương trình có thể khởi chạy chương trình đó ngay.
 > Vì vậy select chương trình và nút start bị disable mặc định. Chỉ enable khi
-> máy trống/an toàn, cửa đóng và bạn chấp nhận máy có thể bắt đầu chạy.
+> máy trống/an toàn, cửa đóng, máy đang bật và bạn chấp nhận máy có thể bắt đầu
+> chạy. Integration không tự gửi lệnh tạm dừng/hủy vì `midea-local` chưa xác
+> nhận định dạng LAN an toàn cho các lệnh đó.
+
+## Việt hóa
+
+Khi Home Assistant dùng ngôn ngữ tiếng Việt, tên entity và các trạng thái
+chương trình được hiển thị bằng tiếng Việt. Các giá trị kỹ thuật như `entity_id`,
+device type `0xE1`, model và khóa giao thức vẫn giữ nguyên để automation không
+bị thay đổi.
+
+## Chẩn đoán
+
+Trang **Download diagnostics** của Home Assistant có thể dùng để gửi thông tin
+debug. Integration tự che device ID, IP, MAC, serial, token và key trước khi
+trả về diagnostics.
 
 ## Tương thích
 

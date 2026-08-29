@@ -14,6 +14,7 @@ CONF_DEVICE = "device"
 DEVICE_TYPE_DISHWASHER = 0xE1
 DEFAULT_PORT = 6444
 DEFAULT_PROTOCOL = 3
+WRITABLE_ATTRIBUTES = frozenset({"power", "child_lock", "storage"})
 
 
 class DishwasherMode(IntEnum):
@@ -71,3 +72,6 @@ MODE_NAMES: dict[int, str] = {
 MODE_CODES = {
     name: code for code, name in MODE_NAMES.items() if code != DishwasherMode.NONE
 }
+
+STATUS_NAMES = ("off", "cancel", "delay", "running", "error", "soft_gear")
+PROGRESS_NAMES = ("idle", "pre_wash", "wash", "rinse", "dry", "complete")
