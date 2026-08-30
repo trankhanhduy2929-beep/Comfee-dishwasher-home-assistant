@@ -40,9 +40,7 @@ async def async_get_config_entry_diagnostics(
             "port": coordinator.local_port,
             "protocol": coordinator.local_protocol,
             "last_update_success": coordinator.last_update_success,
-            "device_available": coordinator.device.available,
+            "device_available": coordinator.data.get("local_connection", False),
         },
-        "device_attributes": {
-            str(key): value for key, value in coordinator.device.attributes.items()
-        },
+        "device_attributes": dict(coordinator.data),
     }

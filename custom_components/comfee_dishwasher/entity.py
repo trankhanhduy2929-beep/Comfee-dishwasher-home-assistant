@@ -38,3 +38,12 @@ class ComfeeDishwasherEntity(CoordinatorEntity[ComfeeDishwasherCoordinator]):
         if device.serial_number:
             device_info["serial_number"] = device.serial_number
         return device_info
+
+    @property
+    def available(self) -> bool:
+        """Return cached local availability without touching the device thread."""
+        if self._entity_key in {"local_connection", "reconnect", "refresh"}:
+            return True
+        return bool(
+            super().available and self.coordinator.data.get("local_connection", False)
+        )

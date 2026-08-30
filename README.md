@@ -54,8 +54,14 @@ MSmartHome được ủy quyền hoặc từ cấu hình local đang hoạt đ�
 ## Kiến trúc mạng
 
 - Cloud chỉ được gọi lúc thêm integration để lấy token/key LAN.
-- Polling trạng thái và lệnh điều khiển chạy trực tiếp qua local TCP, thường là
-  cổng `6444`.
+- Một thread nền duy nhất của `midea-local` giữ kết nối local TCP, thường là
+  cổng `6444`, nhận phản hồi và thông báo trạng thái từ máy.
+- Khi máy phát thông báo LAN, sensor/entity được cập nhật gần như ngay lập tức.
+  Truy vấn local mỗi khoảng 30 giây vẫn được giữ làm dự phòng cho firmware
+  không chủ động báo mọi thay đổi.
+- Callback từ thread thiết bị chỉ đưa dữ liệu vào hàng đợi ngắn, gộp các thay
+  đổi liên tiếp rồi cập nhật Home Assistant trên event loop. Mọi thao tác mạng
+  hoặc dừng thread đều chạy trong executor để không block Home Assistant.
 - Home Assistant và máy rửa bát phải ở cùng LAN/VLAN; client isolation hoặc
   firewall có thể chặn discovery.
 - Sau khi cấu hình xong, integration vẫn có thể hoạt động khi mất Internet nếu
@@ -75,7 +81,8 @@ MSmartHome được ủy quyền hoặc từ cấu hình local đang hoạt đ�
 
 Các entity mới chỉ đọc được tạo theo dữ liệu mà máy thực tế trả về. Vì vậy model
 E1 khác có thể có ít hoặc nhiều trạng thái hơn. Nút **Cập nhật trạng thái** và
-**Kết nối lại LAN** không gọi cloud và không gửi lệnh điều khiển máy.
+**Kết nối lại LAN** không gọi cloud và không gửi lệnh vận hành máy. Nút cập
+nhật chỉ gửi một truy vấn đọc; thread nền vẫn là nơi duy nhất đọc socket.
 
 > [!CAUTION]
 > Với protocol E1, chọn một chương trình có thể khởi chạy chương trình đó ngay.

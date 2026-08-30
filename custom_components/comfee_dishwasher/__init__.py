@@ -101,12 +101,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = ComfeeDishwasherCoordinator(hass, entry, device)
 
     async def _close_device() -> None:
-        await coordinator.async_shutdown()
-        await hass.async_add_executor_job(coordinator.close)
+        await coordinator.async_close()
 
     entry.async_on_unload(_close_device)
     try:
         await coordinator.async_config_entry_first_refresh()
+        await coordinator.async_start()
     except Exception as error:
         await _close_device()
         raise ConfigEntryNotReady("Unable to read the dishwasher state") from error

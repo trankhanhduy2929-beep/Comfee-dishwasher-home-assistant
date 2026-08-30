@@ -61,7 +61,7 @@ class ComponentContractTests(TestCase):
     def test_manifest_contract(self) -> None:
         manifest = json.loads((COMPONENT / "manifest.json").read_text())
         self.assertEqual(manifest["domain"], "comfee_dishwasher")
-        self.assertEqual(manifest["version"], "0.3.0")
+        self.assertEqual(manifest["version"], "0.4.0")
         self.assertEqual(manifest["requirements"], ["midea-local==10.0.1"])
         self.assertEqual(manifest["iot_class"], "local_polling")
         self.assertTrue(manifest["config_flow"])
@@ -340,6 +340,11 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
             self.assertTrue(await async_unload_entry(self.hass, entry))
             await entry._async_process_on_unload(self.hass)
             await self.hass.async_block_till_done()
+        device.register_update.assert_called_once_with(
+            device.unregister_update.call_args.args[0]
+        )
+        device.open.assert_called_once_with()
+        device.close.assert_called_once_with()
         device.close_socket.assert_called_once_with()
 
     async def test_unsupported_local_control_is_rejected(self) -> None:
@@ -388,6 +393,126 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
         with self.assertRaises(HomeAssistantError):
             coordinator._validate_cycle_command()
         await coordinator.async_shutdown()
+
+    async def test_device_callbacks_are_coalesced_on_hass_loop(self) -> None:
+        entry = ConfigEntry(
+            created_at=datetime.now(UTC),
+            data=self._candidate(),
+            discovery_keys=MappingProxyType({}),
+            domain=DOMAIN,
+            minor_version=0,
+            modified_at=datetime.now(UTC),
+            options=None,
+            source="user",
+            state=ConfigEntryState.SETUP_IN_PROGRESS,
+            subentries_data=None,
+            title="Dishwasher",
+            unique_id="123456",
+            version=1,
+        )
+        device = Mock()
+        device.available = True
+        device.attributes = {
+            "power": True,
+            "status": "off",
+            "mode": "eco_wash",
+            "error_code": 0,
+            "wrong_operation": 0,
+        }
+        coordinator = ComfeeDishwasherCoordinator(self.hass, entry, device)
+        coordinator.data = dict(coordinator._cached_data)
+        listener = Mock()
+        coordinator.async_add_listener(listener)
+        await coordinator.async_start()
+        callback = device.register_update.call_args.args[0]
+
+        def emit_updates() -> None:
+            callback({"status": "running"})
+            callback({"progress": "wash", "time_remaining": 42})
+
+        await self.hass.async_add_executor_job(emit_updates)
+        await self.hass.async_block_till_done()
+
+        self.assertEqual(coordinator.data["status"], "running")
+        self.assertEqual(coordinator.data["progress"], "wash")
+        self.assertEqual(coordinator.data["time_remaining"], 42)
+        self.assertFalse(coordinator.data["error_active"])
+        self.assertEqual(listener.call_count, 1)
+
+        await self.hass.async_add_executor_job(
+            callback,
+            {"status": "error", "available": False},
+        )
+        await self.hass.async_block_till_done()
+
+        self.assertTrue(coordinator.data["error_active"])
+        self.assertFalse(coordinator.data["local_connection"])
+        self.assertEqual(listener.call_count, 2)
+        await coordinator.async_close()
+
+    async def test_callback_after_close_is_ignored(self) -> None:
+        entry = ConfigEntry(
+            created_at=datetime.now(UTC),
+            data=self._candidate(),
+            discovery_keys=MappingProxyType({}),
+            domain=DOMAIN,
+            minor_version=0,
+            modified_at=datetime.now(UTC),
+            options=None,
+            source="user",
+            state=ConfigEntryState.SETUP_IN_PROGRESS,
+            subentries_data=None,
+            title="Dishwasher",
+            unique_id="123456",
+            version=1,
+        )
+        device = Mock()
+        device.available = True
+        device.attributes = {"status": "off"}
+        coordinator = ComfeeDishwasherCoordinator(self.hass, entry, device)
+        coordinator.data = dict(coordinator._cached_data)
+        await coordinator.async_start()
+        callback = device.register_update.call_args.args[0]
+        await coordinator.async_close()
+
+        callback({"status": "running"})
+        await self.hass.async_block_till_done()
+
+        self.assertEqual(coordinator.data["status"], "off")
+
+    async def test_first_refresh_uses_cache_and_manual_refresh_uses_executor(
+        self,
+    ) -> None:
+        entry = ConfigEntry(
+            created_at=datetime.now(UTC),
+            data=self._candidate(),
+            discovery_keys=MappingProxyType({}),
+            domain=DOMAIN,
+            minor_version=0,
+            modified_at=datetime.now(UTC),
+            options=None,
+            source="user",
+            state=ConfigEntryState.SETUP_IN_PROGRESS,
+            subentries_data=None,
+            title="Dishwasher",
+            unique_id="123456",
+            version=1,
+        )
+        device = Mock()
+        device.available = True
+        device.attributes = {"status": "off"}
+        coordinator = ComfeeDishwasherCoordinator(self.hass, entry, device)
+
+        await coordinator.async_config_entry_first_refresh()
+
+        device.connect.assert_not_called()
+        device.refresh_status.assert_not_called()
+
+        await coordinator.async_request_device_refresh()
+
+        device.refresh_status.assert_called_once_with()
+        device.connect.assert_not_called()
+        await coordinator.async_close()
 
     async def test_setup_rediscovers_changed_ip(self) -> None:
         entry = ConfigEntry(

@@ -126,14 +126,19 @@ class ComfeeDishwasherBinarySensor(ComfeeDishwasherEntity, BinarySensorEntity):
     def is_on(self) -> bool | None:
         """Return whether the condition is active."""
         if self.entity_description.key == "local_connection":
-            return bool(
-                self.coordinator.last_update_success
-                and self.coordinator.device.available
-            )
+            return bool(self.coordinator.data.get("local_connection", False))
         source_key = DERIVED_SOURCE_KEYS.get(self.entity_description.key)
         if source_key is not None:
-            value = self.coordinator.data.get(source_key)
-            return bool(value) if isinstance(value, (int, float)) else None
+            value = self.coordinator.data.get(self.entity_description.key)
+            if isinstance(value, bool):
+                return value
+            source_value = self.coordinator.data.get(source_key)
+            return (
+                bool(source_value)
+                if isinstance(source_value, (int, float))
+                and not isinstance(source_value, bool)
+                else None
+            )
         value = self.coordinator.data.get(self.entity_description.key)
         return value if isinstance(value, bool) else None
 

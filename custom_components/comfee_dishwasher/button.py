@@ -49,7 +49,7 @@ class ComfeeDishwasherRefreshButton(ComfeeDishwasherEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Query current state without sending a control command."""
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_request_device_refresh()
 
 
 class ComfeeDishwasherReconnectButton(ComfeeDishwasherEntity, ButtonEntity):

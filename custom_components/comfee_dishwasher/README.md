@@ -4,8 +4,12 @@ Custom integration cho Home Assistant, kết nối máy rửa bát Comfee/Midea 
 thiết bị `0xE1` bằng giao thức local của `midea-local`.
 
 - Cloud chỉ được dùng lúc cấu hình để lấy token/key LAN.
-- Sau khi cấu hình, polling và lệnh điều khiển đi thẳng qua mạng nội bộ,
+- Sau khi cấu hình, trạng thái và lệnh điều khiển đi thẳng qua mạng nội bộ,
   thường qua TCP `6444`.
+- Một thread nền duy nhất nhận thông báo LAN và tự cập nhật entity; truy vấn
+  khoảng 30 giây là dự phòng khi firmware không phát đủ thông báo.
+- Callback được gộp trước khi báo Home Assistant, còn mọi I/O và teardown chạy
+  ngoài event loop để tránh làm nặng hoặc treo Home Assistant.
 - Mật khẩu tài khoản MSmartHome không được lưu trong config entry.
 - Integration hiển thị các trường E1 mà máy trả về, gồm UV, sấy, van cấp nước,
   mã chẩn đoán và cảnh báo thao tác nếu firmware có hỗ trợ.

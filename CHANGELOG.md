@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0 — 2026-08-29
+
+- Keep one daemonized `midea-local` service thread as the only socket reader.
+- Apply unsolicited LAN messages to all Home Assistant entities automatically.
+- Coalesce callback bursts before notifying entities to reduce recorder and
+  event-loop load.
+- Keep the library's 30-second local query as a low-cost fallback for firmware
+  that does not emit every state change.
+- Run connect, refresh, reconnect, commands and teardown outside Home
+  Assistant's event loop.
+- Mark normal entities unavailable from the cached LAN state while leaving
+  refresh, reconnect and connectivity diagnostics accessible.
+
 ## 0.3.0 — 2026-08-29
 
 - Expose the remaining E1 read-only states: UV, drying, water inlet, option
