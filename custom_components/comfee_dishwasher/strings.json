@@ -2,55 +2,61 @@
   "config": {
     "step": {
       "user": {
-        "title": "Comfee dishwasher",
-        "description": "Choose cloud discovery or enter the local LAN credentials manually.",
+        "title": "Comfee / Midea local devices",
+        "description": "Add a supported appliance using its Midea-family app account or by entering local LAN credentials.",
         "menu_options": {
-          "cloud": "Discover with MSmartHome account",
+          "cloud": "Discover with appliance app account",
           "manual": "Enter local token and key"
         }
       },
       "cloud": {
-        "title": "MSmartHome account",
-        "description": "The account is used only during setup to obtain the local device key. It is not saved in the config entry.",
+        "title": "Appliance app account",
+        "description": "Choose the app/cloud used to register the appliance. The account is used only during setup to obtain local keys, and the password is not saved.",
         "data": {
+          "cloud_name": "App / cloud provider",
           "account": "Email or account",
           "password": "Password",
-          "ip_address": "Dishwasher IP (optional)"
+          "ip_address": "Device IP (optional)"
         }
       },
       "select_device": {
-        "title": "Select dishwasher",
-        "description": "Select the dishwasher to add.",
+        "title": "Select appliance",
+        "description": "Select one supported local appliance to add. Run the flow again to add another device.",
         "data": {
           "device": "Device"
         }
       },
       "manual": {
-        "title": "Local dishwasher credentials",
-        "description": "Use hexadecimal token and key values obtained from MSmartHome.",
+        "title": "Local appliance credentials",
+        "description": "Select the protocol type and enter the hexadecimal token/key obtained from an authorized appliance-app session.",
         "data": {
           "device_id": "Device ID",
           "ip_address": "IP address",
           "port": "TCP port",
           "protocol": "Protocol version",
+          "type": "Device type",
+          "subtype": "Device subtype",
           "model": "Model",
           "name": "Name",
+          "brand": "Brand (optional)",
+          "manufacturer_code": "Manufacturer code (optional)",
           "token": "Token",
           "key": "Key"
         }
       }
     },
     "error": {
-      "cloud_login_failed": "MSmartHome login failed.",
-      "device_not_found": "No E1 dishwasher was found on the local network.",
-      "device_not_in_account": "The discovered dishwasher is not present in this MSmartHome account.",
+      "cloud_login_failed": "The selected appliance app account could not log in.",
+      "device_not_found": "No device with a driver supported by this integration was found on the local network.",
+      "device_not_in_account": "None of the discovered local devices are present in the selected app account.",
       "device_auth_failed": "The device was found, but no local key could authenticate it.",
       "invalid_token": "Token and key must be non-empty hexadecimal values.",
-      "manual_auth_failed": "The local credentials did not authenticate the dishwasher.",
-      "setup_failed": "The dishwasher setup failed. Check the account, network and device state."
+      "unsupported_device_type": "This device type has no driver in the pinned midea-local version.",
+      "manual_auth_failed": "The local credentials did not authenticate the appliance.",
+      "setup_failed": "Setup failed. Check the account, network, selected device type and appliance state."
     },
     "abort": {
-      "already_configured": "This dishwasher is already configured."
+      "already_configured": "This appliance is already configured."
     }
   },
   "entity": {
@@ -254,13 +260,13 @@
       "message": "Select a wash program before starting."
     },
     "unsupported_control": {
-      "message": "This control is not supported by the local E1 protocol."
+      "message": "This control is not in the verified local-command allow list for this device type."
     },
     "command_failed": {
-      "message": "The local command could not be sent to the dishwasher."
+      "message": "The local command could not be sent to the appliance."
     },
     "local_connection_failed": {
-      "message": "The dishwasher could not be connected over the local network."
+      "message": "The appliance could not be connected over the local network."
     },
     "unsupported_program": {
       "message": "This wash program is not supported by the dishwasher."

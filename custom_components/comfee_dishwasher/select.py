@@ -29,7 +29,7 @@ class ComfeeDishwasherSelect(ComfeeDishwasherEntity, SelectEntity):
     @property
     def current_option(self) -> str | None:
         """Return the current program."""
-        value = self.coordinator.data.get("mode")
+        value = (self.coordinator.data or {}).get("mode")
         return value if isinstance(value, str) and value in MODE_CODES else None
 
     @property
@@ -54,5 +54,5 @@ async def async_setup_entry(
 ) -> None:
     """Set up the wash-program select."""
     coordinator: ComfeeDishwasherCoordinator = entry.runtime_data
-    if "mode" in coordinator.data:
+    if coordinator.device_type == 0xE1 and "mode" in coordinator.data:
         async_add_entities([ComfeeDishwasherSelect(coordinator)])

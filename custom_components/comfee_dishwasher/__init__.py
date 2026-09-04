@@ -1,4 +1,4 @@
-"""Comfee dishwasher integration using the Midea local protocol."""
+"""Comfee/Midea-family integration using the Midea local protocol."""
 
 from collections.abc import Mapping
 from typing import Any
@@ -27,9 +27,9 @@ from .const import (
     CONF_MAC,
     CONF_SERIAL_NUMBER,
     CONF_SUBTYPE,
-    DEVICE_TYPE_DISHWASHER,
 )
 from .coordinator import ComfeeDishwasherCoordinator
+from .device_profiles import profile_name
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -41,7 +41,7 @@ PLATFORMS: list[Platform] = [
 
 
 def _create_device(data: Mapping[str, Any]) -> MideaDevice | None:
-    """Create the E1 device implementation from a config entry."""
+    """Create the selected Midea-family device implementation."""
     return device_selector(
         name=data[CONF_NAME],
         device_id=data[CONF_DEVICE_ID],
@@ -68,20 +68,23 @@ def _connect_device(device: MideaDevice) -> bool:
 
 
 def _discover_current_ip(device_id: int) -> str | None:
-    """Find the current address of a configured dishwasher."""
+    """Find the current address of a configured local appliance."""
     info = discover().get(device_id)
-    if info is None or int(info.get(CONF_TYPE, 0)) != DEVICE_TYPE_DISHWASHER:
+    if info is None:
         return None
     ip_address = info.get(CONF_IP_ADDRESS)
     return str(ip_address) if ip_address else None
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up a Comfee dishwasher config entry."""
+    """Set up a Comfee/Midea-family local appliance config entry."""
     data = dict(entry.data)
+    device_type = int(data.get(CONF_TYPE, 0xE1))
     device = await hass.async_add_executor_job(_create_device, data)
     if device is None:
-        raise ConfigEntryError("The configured device is not an E1 dishwasher")
+        raise ConfigEntryError(
+            f"No local driver is available for {profile_name(device_type, vietnamese=False)}"
+        )
 
     connected = await hass.async_add_executor_job(_connect_device, device)
     if not connected:
@@ -96,7 +99,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 data[CONF_IP_ADDRESS] = current_ip
                 hass.config_entries.async_update_entry(entry, data=data)
     if not connected:
-        raise ConfigEntryNotReady("Unable to authenticate with the dishwasher")
+        raise ConfigEntryNotReady("Unable to authenticate with the local appliance")
 
     coordinator = ComfeeDishwasherCoordinator(hass, entry, device)
 
@@ -110,7 +113,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.async_start()
     except Exception as error:
         await _close_device()
-        raise ConfigEntryNotReady("Unable to read the dishwasher state") from error
+        raise ConfigEntryNotReady("Unable to read the local appliance state") from error
 
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -118,5 +121,5 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a Comfee dishwasher config entry."""
+    """Unload a local appliance config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

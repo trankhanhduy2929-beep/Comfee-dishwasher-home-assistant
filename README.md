@@ -2,20 +2,25 @@
   <img src="custom_components/comfee_dishwasher/brand/logo.png" alt="Comfee" width="560">
 </p>
 
-# Comfee Dishwasher for Home Assistant
+# Comfee / Midea Local Appliances for Home Assistant
 
 [![Validate](https://github.com/trankhanhduy2929-beep/Comfee-dishwasher-home-assistant/actions/workflows/validate.yml/badge.svg)](https://github.com/trankhanhduy2929-beep/Comfee-dishwasher-home-assistant/actions/workflows/validate.yml)
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=trankhanhduy2929-beep&repository=Comfee-dishwasher-home-assistant&category=integration)
 
-Custom integration không chính thức để kết nối máy rửa bát Comfee/Midea loại
-`0xE1` với Home Assistant. Integration dùng tài khoản MSmartHome **chỉ trong
-bước cấu hình** để lấy token/key LAN; sau đó Home Assistant đọc trạng thái và
-gửi lệnh trực tiếp đến máy qua mạng nội bộ.
+Custom integration không chính thức để kết nối thiết bị thuộc hệ sinh thái
+Midea với Home Assistant qua mạng nội bộ. Bản `0.6.0` giữ nguyên domain
+`comfee_dishwasher` để không làm mất cấu hình máy rửa bát Comfee hiện có, đồng
+thời mở rộng discovery và đọc trạng thái cho toàn bộ 36 driver có sẵn trong
+`midea-local 10.1.0`.
+
+Tài khoản cloud chỉ được dùng trong bước cấu hình để lấy token/key LAN. Sau khi
+thêm thiết bị, Home Assistant đọc trạng thái và gửi các lệnh đã cho phép trực
+tiếp đến thiết bị qua LAN.
 
 > [!IMPORTANT]
-> Đây là dự án cộng đồng, không liên kết hoặc được Comfee/Midea chứng thực.
-> Không cấu hình cùng một máy đồng thời trong integration **Midea** chính thức
-> và **Comfee Dishwasher**.
+> Đây là dự án cộng đồng, không liên kết hoặc được Comfee, Midea hay các hãng
+> tương thích chứng thực. Không cấu hình cùng một thiết bị đồng thời trong
+> integration này và một integration Midea khác.
 
 ## Cài đặt qua HACS
 
@@ -24,9 +29,6 @@ gửi lệnh trực tiếp đến máy qua mạng nội bộ.
 Nhấn nút **Open in HACS** phía trên, chọn **Download**, sau đó restart Home
 Assistant.
 
-HACS sẽ lấy bản ZIP từ GitHub Release. Nếu repository chưa xuất hiện trong HACS,
-hãy thêm repository thủ công theo hướng dẫn dưới đây.
-
 ### Thêm repository thủ công
 
 1. Mở **HACS → Integrations**.
@@ -34,131 +36,184 @@ hãy thêm repository thủ công theo hướng dẫn dưới đây.
 3. Nhập repository:
    `https://github.com/trankhanhduy2929-beep/Comfee-dishwasher-home-assistant`
 4. Chọn loại **Integration**, rồi nhấn **Add**.
-5. Mở repository **Comfee Dishwasher**, chọn **Download** và restart Home
-   Assistant.
-6. Vào **Settings → Devices & services → Add integration → Comfee Dishwasher**.
+5. Mở repository **Comfee / Midea Local Appliances**, chọn **Download** và
+   restart Home Assistant.
+6. Vào **Settings → Devices & services → Add integration → Comfee / Midea
+   Local Appliances**.
 
 ## Cách kết nối
 
-### MSmartHome account — khuyến nghị
+### Tài khoản ứng dụng — khuyến nghị
 
-Nhập tài khoản đã liên kết với máy rửa bát. Password chỉ tồn tại trong phiên
-config flow và **không được lưu**. Config entry chỉ lưu thông tin cần thiết để
-xác thực LAN, gồm token/key cục bộ của thiết bị.
+Chọn đúng ứng dụng/cloud đã dùng để đăng ký thiết bị:
 
-### Manual LAN credentials
+- **MSmartHome / SmartHome**
+- **NetHome Plus**
+- **Midea Air / Arctic King**
+- **Ariston Clima**
+- **Midea Meiju / 美的美居** cho tài khoản Trung Quốc
 
-Dùng khi bạn đã có device ID, IP, protocol version, token và key từ một phiên
-MSmartHome được ủy quyền hoặc từ cấu hình local đang hoạt động.
+Nhập tài khoản và mật khẩu của ứng dụng đó. Mật khẩu, tài khoản và tên cloud
+không được lưu trong config entry; chỉ device ID, IP, model, loại thiết bị,
+token/key LAN và metadata không nhạy cảm cần cho kết nối cục bộ được lưu.
+
+Nếu có nhiều thiết bị tương thích trong tài khoản, config flow sẽ cho chọn một
+thiết bị. Chạy lại quy trình để thêm thiết bị tiếp theo.
+
+### Thông tin LAN thủ công
+
+Dùng khi đã có device ID, IP, protocol version, loại thiết bị, subtype, token và
+key từ một phiên ứng dụng được ủy quyền hoặc từ cấu hình local đang hoạt động.
+Chọn đúng mã loại `0x..`; integration từ chối loại không có driver thay vì thử
+kết nối sai.
+
+## Mức hỗ trợ
+
+### Máy rửa bát Comfee/Midea `0xE1`
+
+- Đã xác minh thực tế trên Comfee `760EY095`, protocol V3.
+- Có entity riêng cho trạng thái, chương trình, tiến độ, cửa, cảnh báo, sấy,
+  UV, cấp nước, nguồn, khóa trẻ em và bảo quản/sấy khí.
+- Có select chương trình và nút start nhưng bị tắt mặc định để tránh máy tự chạy.
+- Có điện/nước ước tính cho lần rửa gần nhất, hôm nay và tháng này.
+
+### Máy rửa bát dạng bồn `0x34`
+
+- Đọc các thuộc tính mà driver LAN trả về.
+- Có switch nguồn, khóa trẻ em và bảo quản nếu model công bố các thuộc tính đó.
+- Không dùng select/start hoặc định mức điện nước dành riêng cho E1.
+
+### Các loại thiết bị còn lại
+
+- Tạo sensor cho số, chuỗi, enum, danh sách hoặc dữ liệu chẩn đoán.
+- Tạo binary sensor cho trạng thái boolean như cửa, đang chạy, cảnh báo và lỗi.
+- Thuộc tính quan trọng được bật mặc định; thuộc tính hiếm/chẩn đoán bị tắt mặc
+  định để giảm số state ghi vào Recorder và tránh làm nặng Home Assistant.
+- Chỉ tạo switch cho thuộc tính nằm trong allow-list của đúng driver. Các
+  switch generic bị tắt mặc định; chỉ bật sau khi đối chiếu tính năng trong app.
+- Chưa tạo giao diện chuyên dụng kiểu `climate`, `fan`, `vacuum`, `light` hoặc
+  `water_heater`. Các thiết bị này hiện dùng entity generic an toàn trước.
+
+## Loại thiết bị
+
+Catalog `0.6.0` có 36 loại driver LAN:
+
+| Nhóm | Mã loại và thiết bị |
+| --- | --- |
+| Chiếu sáng | `0x13` đèn thông minh |
+| Không khí và tiện nghi | `0x26` máy sưởi nhà tắm, `0x40` quạt trần tích hợp, `0xA1` máy hút ẩm, `0xAC` điều hòa, `0xAD` cảm biến không khí, `0xCC` bộ điều khiển điều hòa, `0xCE` cấp gió tươi, `0xCF` bơm nhiệt, `0xFA` quạt, `0xFB` máy sưởi, `0xFC` máy lọc không khí, `0xFD` máy tạo ẩm |
+| Nhà bếp | `0x34` máy rửa bát dạng bồn, `0xB0` lò vi sóng, `0xB1` lò nướng, `0xB3` tủ khử khuẩn, `0xB4` máy nướng bánh mì, `0xB6` máy hút mùi, `0xBF` lò hấp/vi sóng, `0xE1` máy rửa bát, `0xE8` nồi nấu chậm, `0xEA` nồi cơm, `0xEC` nồi áp suất |
+| Giặt sấy | `0xDA` máy giặt cửa trên, `0xDB` máy giặt cửa trước, `0xDC` máy sấy |
+| Nước, nhiệt và phòng tắm | `0xC2` bồn cầu thông minh, `0xC3` bộ điều khiển bơm nhiệt, `0xCD` bình nóng lạnh bơm nhiệt, `0xE2` bình nóng lạnh điện, `0xE3` bình nóng lạnh gas, `0xE6` lò hơi gas, `0xED` máy lọc/làm mềm nước |
+| Làm lạnh | `0xCA` tủ lạnh |
+| Làm sạch | `0xB8` robot hút bụi |
+
+Một driver tồn tại không có nghĩa mọi model của loại đó đều tương thích hoàn
+toàn. Firmware có thể trả về ít hoặc nhiều thuộc tính khác nhau; integration
+chỉ tạo entity cho dữ liệu model thực tế công bố.
+
+## Hãng tương thích
+
+Giao thức này xuất hiện trên thiết bị Midea và nhiều thương hiệu OEM. Integration
+nhận diện tên hãng từ metadata dạng chữ, gồm Comfee, Midea, Toshiba, Carrier,
+COLMO, Little Swan, Electrolux, Eureka, Rotenso, Ariston, Arctic King, Inventor,
+Pro Breeze, MDV, Wahin, Netsu, Beverly, Bugu, Vandelo và một số nhãn khác.
+
+Không suy đoán hãng chỉ từ manufacturer code vì mã có thể thay đổi theo vùng.
+Nếu cloud trả về trường tên hãng hợp lệ, integration giữ tên OEM đó ngay cả khi
+chưa có trong danh sách alias. Nếu metadata không đủ rõ, Home Assistant hiển thị
+tên trung lập **Midea ecosystem**. Khả năng kết nối vẫn phụ thuộc loại driver,
+firmware và app/cloud đã dùng để đăng ký thiết bị.
 
 ## Kiến trúc mạng
 
 - Cloud chỉ được gọi lúc thêm integration để lấy token/key LAN.
-- Một thread nền duy nhất của `midea-local` giữ kết nối local TCP, thường là
-  cổng `6444`, nhận phản hồi và thông báo trạng thái từ máy.
-- Khi máy phát thông báo LAN, sensor/entity được cập nhật gần như ngay lập tức.
-  Truy vấn local mỗi khoảng 30 giây vẫn được giữ làm dự phòng cho firmware
-  không chủ động báo mọi thay đổi.
-- Callback từ thread thiết bị chỉ đưa dữ liệu vào hàng đợi ngắn, gộp các thay
-  đổi liên tiếp rồi cập nhật Home Assistant trên event loop. Mọi thao tác mạng
-  hoặc dừng thread đều chạy trong executor để không block Home Assistant.
-- Home Assistant và máy rửa bát phải ở cùng LAN/VLAN; client isolation hoặc
-  firewall có thể chặn discovery.
-- Sau khi cấu hình xong, integration vẫn có thể hoạt động khi mất Internet nếu
-  mạng LAN và token/key của thiết bị không thay đổi.
-- Nên đặt DHCP reservation. Nếu IP thay đổi, integration sẽ thử tìm lại thiết
-  bị theo device ID trong lần setup kế tiếp.
+- Mỗi thiết bị dùng một thread nền của `midea-local` để giữ kết nối TCP cục bộ,
+  thường ở cổng `6444`.
+- Thông báo LAN được đưa vào hàng đợi ngắn, gộp các thay đổi liên tiếp rồi cập
+  nhật Home Assistant trên event loop. Cách này giữ cập nhật gần thời gian thực
+  nhưng tránh tạo quá nhiều state/event.
+- Truy vấn local định kỳ của driver được giữ làm dự phòng cho firmware không
+  chủ động phát mọi thay đổi.
+- Connect, refresh, reconnect, command và teardown đều chạy ngoài event loop.
+- Home Assistant và thiết bị phải liên lạc được trong cùng LAN/VLAN. Client
+  isolation hoặc firewall có thể chặn discovery và TCP local.
+- Sau khi cấu hình, integration có thể hoạt động khi mất Internet nếu LAN và
+  token/key của thiết bị không thay đổi.
+- Nên đặt DHCP reservation. Khi setup lại, integration có thể dò lại IP theo
+  device ID nếu địa chỉ đã đổi.
 
-## Entity
+## Điện và nước máy rửa bát E1
 
-- Trạng thái, chương trình hiện tại, giai đoạn rửa, thời gian còn lại và nhiệt độ nước.
-- Mức độ ẩm, mức chất trợ xả, mức làm mềm nước, thời gian bảo quản còn lại và mã chẩn đoán.
-- Cửa, thiếu chất trợ xả, thiếu muối, thiếu nước, sấy, bảo quản/sấy khí, UV và van cấp nước.
-- Cảnh báo lỗi/thao tác và trạng thái kết nối LAN để dùng trong automation.
-- Switch nguồn, khóa trẻ em và bảo quản/sấy khí; đây là ba lệnh ghi LAN đã được thư viện xác nhận.
-- Nút cập nhật trạng thái, kết nối lại LAN và nút khởi động chương trình hiện tại.
-- Select chương trình vẫn tắt mặc định vì một số firmware E1 chạy ngay khi chọn.
-- Điện và nước **ước tính** cho lần rửa hoàn tất gần nhất, tổng trong ngày và
-  tổng trong tháng; dữ liệu được lưu cục bộ để không mất sau khi Home Assistant
-  khởi động lại.
+Firmware Comfee E1 `760EY095` không trả về công tơ kWh/lít qua giao thức local.
+Sáu sensor tiêu thụ của E1 vì vậy là **ước tính**, dùng định mức tham khảo theo
+chương trình của profile `7600024L`, không phải số đo thực tế riêng của
+`760EY095`:
 
-> [!NOTE]
-> Firmware E1 của Comfee `760EY095` không trả về công tơ kWh/lít qua giao thức
-> local. Các sensor tiêu thụ dùng định mức tham khảo theo chương trình của
-> profile E1 `7600024L` (không phải thông số đã xác nhận riêng cho `760EY095`,
-> và không phải số đo thực tế): `eco_wash` 0,99 kWh / 10,4 L, `strong_wash` 1,28 kWh /
-> 13,9 L, `hour_wash` 0,91 kWh / 10,4 L, `soak_wash` 0,02 kWh / 3,4 L,
-> `self_clean` 1,524 kWh / 10,3 L, `germ` 0,765 kWh / 9,9 L và `fruit_wash`
-> 1,625 kWh / 13,3 L. Chương trình chưa có định mức sẽ hiện `Unknown` và không
-> làm tăng tổng. Chu kỳ được tính theo thời điểm máy báo hoàn tất; nếu
-> Home Assistant tắt suốt cả chu kỳ thì chu kỳ đó không thể được ghi nhận.
+- `eco_wash`: 0,99 kWh / 10,4 L
+- `strong_wash`: 1,28 kWh / 13,9 L
+- `hour_wash`: 0,91 kWh / 10,4 L
+- `soak_wash`: 0,02 kWh / 3,4 L
+- `self_clean`: 1,524 kWh / 10,3 L
+- `germ`: 0,765 kWh / 9,9 L
+- `fruit_wash`: 1,625 kWh / 13,3 L
 
-Các entity trạng thái E1 chỉ đọc được tạo theo dữ liệu mà máy thực tế trả về.
-Vì vậy model E1 khác có thể có ít hoặc nhiều trạng thái hơn; sáu sensor tiêu
-thụ ở trên là giá trị tính cục bộ từ trạng thái chu kỳ. Nút **Cập nhật trạng thái**
-và
-**Kết nối lại LAN** không gọi cloud và không gửi lệnh vận hành máy. Nút cập
-nhật chỉ gửi một truy vấn đọc; thread nền vẫn là nơi duy nhất đọc socket.
+Chương trình chưa có định mức hiển thị `Unknown` và không tăng tổng. Chu kỳ bị
+hủy/lỗi không được cộng. Dữ liệu ngày/tháng được lưu cục bộ và reset theo múi
+giờ Home Assistant. Nếu Home Assistant tắt trong toàn bộ chu kỳ thì chu kỳ đó
+không thể được ghi nhận.
 
 > [!CAUTION]
-> Với protocol E1, chọn một chương trình có thể khởi chạy chương trình đó ngay.
-> Vì vậy select chương trình và nút start bị disable mặc định. Chỉ enable khi
-> máy trống/an toàn, cửa đóng, máy đang bật và bạn chấp nhận máy có thể bắt đầu
-> chạy. Integration không tự gửi lệnh tạm dừng/hủy vì `midea-local` chưa xác
-> nhận định dạng LAN an toàn cho các lệnh đó.
+> Với protocol E1, chọn chương trình có thể khởi chạy máy ngay. Select chương
+> trình và nút start vì vậy bị disable mặc định. Với thiết bị generic, chỉ bật
+> switch sau khi xác nhận model có đúng tùy chọn tương ứng trong ứng dụng hãng.
 
 ## Việt hóa
 
-Khi Home Assistant dùng ngôn ngữ tiếng Việt, tên entity và các trạng thái
-chương trình được hiển thị bằng tiếng Việt. Các giá trị kỹ thuật như `entity_id`,
-device type `0xE1`, model và khóa giao thức vẫn giữ nguyên để automation không
-bị thay đổi.
+Config flow, lỗi, tên entity E1 và tên thuộc tính generic đều có tiếng Việt.
+Các khóa kỹ thuật như `entity_id`, device type `0x..`, model và tên thuộc tính
+giao thức được giữ ổn định để automation không bị thay đổi.
 
 ## Chẩn đoán
 
-Trang **Download diagnostics** của Home Assistant có thể dùng để gửi thông tin
-debug. Integration tự che device ID, IP, MAC, serial, token và key trước khi
-trả về diagnostics.
-
-## Tương thích
-
-- Device type: `0xE1`.
-- Local protocol: V2/V3 do thư viện `midea-local` hỗ trợ.
-- Đã xác minh trên Comfee model `760EY095`, protocol V3.
-- Các model E1 khác có thể dùng được nhưng chưa được kiểm thử đầy đủ.
+Trang **Download diagnostics** của Home Assistant che device ID, IP, MAC,
+serial, token và key trước khi xuất dữ liệu. Khi báo lỗi, nên gửi diagnostics
+và ghi rõ hãng, model, app/cloud, mã loại thiết bị, phiên bản Home Assistant và
+phiên bản integration.
 
 ## Cài thủ công
 
 Tải asset `comfee_dishwasher.zip` từ trang **Releases**, tạo thư mục
 `/config/custom_components/comfee_dishwasher/`, rồi giải nén trực tiếp các file
-trong ZIP vào thư mục đó. Sau đó restart Home Assistant. Cấu trúc đúng là:
+trong ZIP vào thư mục đó. Cấu trúc đúng là:
 
 ```text
 /config/custom_components/comfee_dishwasher/manifest.json
 ```
 
-Không để thành
-`/config/custom_components/comfee_dishwasher/comfee_dishwasher/manifest.json`.
-Nếu đã cập nhật bản `0.5.0` và gặp cấu trúc lồng này, hãy cập nhật lên bản mới,
-xóa riêng thư mục `comfee_dishwasher` nằm bên trong rồi restart Home Assistant.
+Không để thành:
+
+```text
+/config/custom_components/comfee_dishwasher/comfee_dishwasher/manifest.json
+```
+
+Nếu từng gặp lỗi thư mục lồng sau khi update, xóa riêng thư mục
+`comfee_dishwasher` nằm bên trong, cài lại bản ZIP mới rồi restart Home
+Assistant.
 
 ## Build và kiểm tra
 
 ```bash
+ruff check .
+ruff format --check .
+python3 -m compileall -q custom_components
 python3 build_component.py
-python3 -m unittest discover -s tests
+pytest -q
 ```
 
-Builder tạo `dist/comfee_dishwasher.zip` và file SHA-256 tương ứng. GitHub
-Actions chạy HACS validation và Hassfest cho mọi push/pull request; tag dạng
-`v*` sẽ tự build một GitHub Release.
+Builder tạo `dist/comfee_dishwasher.zip` có cấu trúc phẳng và file SHA-256
+tương ứng. GitHub Actions chạy HACS validation và Hassfest cho mọi push/pull
+request; tag dạng `v*` sẽ tạo GitHub Release.
 
-## Báo lỗi
-
-Khi mở issue, hãy ghi model máy, phiên bản Home Assistant, phiên bản integration
-và log đã xóa account, password, token, key, device ID, MAC và serial number.
-
-Comfee và Midea là nhãn hiệu của chủ sở hữu tương ứng; hình ảnh thương hiệu
-trong repository chỉ dùng để nhận diện integration. Logo và biểu tượng Comfee
-được lấy từ các tài nguyên thương hiệu công khai trên website chính thức
-Comfee.
+Comfee, Midea và các tên hãng khác là nhãn hiệu của chủ sở hữu tương ứng. Logo
+và biểu tượng Comfee trong repository chỉ dùng để nhận diện integration gốc.

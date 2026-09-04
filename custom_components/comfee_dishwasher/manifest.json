@@ -1,6 +1,6 @@
 {
   "domain": "comfee_dishwasher",
-  "name": "Comfee Dishwasher",
+  "name": "Comfee / Midea Local Appliances",
   "codeowners": ["@trankhanhduy2929-beep"],
   "config_flow": true,
   "dependencies": [],
@@ -9,6 +9,6 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/trankhanhduy2929-beep/Comfee-dishwasher-home-assistant/issues",
   "loggers": ["midealocal"],
-  "requirements": ["midea-local==10.0.1"],
-  "version": "0.5.1"
+  "requirements": ["midea-local==10.1.0"],
+  "version": "0.6.0"
 }

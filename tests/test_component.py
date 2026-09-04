@@ -6,6 +6,7 @@ import json
 import tempfile
 from datetime import UTC, datetime
 from hashlib import sha256
+from importlib import import_module
 from pathlib import Path
 from types import MappingProxyType
 from unittest import IsolatedAsyncioTestCase, TestCase
@@ -26,6 +27,8 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from midealocal.const import ProtocolVersion
+from midealocal.devices import device_selector
 from midealocal.devices.e1 import MideaE1Device
 
 import build_component
@@ -39,9 +42,14 @@ from custom_components.comfee_dishwasher import (
     sensor,
     switch,
 )
+from custom_components.comfee_dishwasher.attribute_catalog import attribute_hint
 from custom_components.comfee_dishwasher.const import (
     CONF_ACCOUNT,
+    CONF_BRAND,
+    CONF_CLOUD_NAME,
     CONF_KEY,
+    CONF_KEY_METHOD,
+    CONF_SERIAL_NUMBER,
     CONF_SUBTYPE,
     DOMAIN,
     ESTIMATED_ENERGY_LAST_CYCLE,
@@ -57,6 +65,10 @@ from custom_components.comfee_dishwasher.const import (
 from custom_components.comfee_dishwasher.coordinator import (
     ComfeeDishwasherCoordinator,
 )
+from custom_components.comfee_dishwasher.device_profiles import (
+    DEVICE_PROFILES,
+    resolve_device_brand,
+)
 from custom_components.comfee_dishwasher.usage import DishwasherUsageTracker
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,8 +81,8 @@ class ComponentContractTests(TestCase):
     def test_manifest_contract(self) -> None:
         manifest = json.loads((COMPONENT / "manifest.json").read_text())
         self.assertEqual(manifest["domain"], "comfee_dishwasher")
-        self.assertEqual(manifest["version"], "0.5.1")
-        self.assertEqual(manifest["requirements"], ["midea-local==10.0.1"])
+        self.assertEqual(manifest["version"], "0.6.0")
+        self.assertEqual(manifest["requirements"], ["midea-local==10.1.0"])
         self.assertEqual(manifest["iot_class"], "local_polling")
         self.assertTrue(manifest["config_flow"])
 
@@ -125,6 +137,155 @@ class ComponentContractTests(TestCase):
 
     def test_mode_table_matches_dependency(self) -> None:
         self.assertEqual(MODE_NAMES, MideaE1Device._modes)
+
+    def test_supported_driver_catalog_matches_dependency(self) -> None:
+        self.assertEqual(len(DEVICE_PROFILES), 36)
+        self.assertEqual(
+            set(DEVICE_PROFILES),
+            {
+                0x13,
+                0x26,
+                0x34,
+                0x40,
+                0xA1,
+                0xAC,
+                0xAD,
+                0xB0,
+                0xB1,
+                0xB3,
+                0xB4,
+                0xB6,
+                0xB8,
+                0xBF,
+                0xC2,
+                0xC3,
+                0xCA,
+                0xCC,
+                0xCD,
+                0xCE,
+                0xCF,
+                0xDA,
+                0xDB,
+                0xDC,
+                0xE1,
+                0xE2,
+                0xE3,
+                0xE6,
+                0xE8,
+                0xEA,
+                0xEC,
+                0xED,
+                0xFA,
+                0xFB,
+                0xFC,
+                0xFD,
+            },
+        )
+        for device_type in DEVICE_PROFILES:
+            device = device_selector(
+                name="Test appliance",
+                device_id=1,
+                device_type=device_type,
+                ip_address="192.0.2.10",
+                port=6444,
+                token="00" * 64,
+                key="00" * 32,
+                device_protocol=ProtocolVersion.V3,
+                model="test",
+                subtype=0,
+                customize="",
+            )
+            self.assertIsNotNone(device, f"Missing driver for 0x{device_type:02X}")
+
+    def test_brand_resolution_uses_text_without_guessing_codes(self) -> None:
+        self.assertEqual(resolve_device_brand(0xAC, "Toshiba Home AC"), "Toshiba")
+        self.assertEqual(
+            resolve_device_brand(0xAC, "Arctic King window AC"),
+            "Arctic King",
+        )
+        self.assertEqual(
+            resolve_device_brand(0xAC, explicit_brand="Keystone"),
+            "Keystone",
+        )
+        self.assertEqual(
+            resolve_device_brand(0xAC, explicit_brand="0000"),
+            "Midea ecosystem",
+        )
+        self.assertEqual(
+            resolve_device_brand(
+                0xAC,
+                "Toshiba Living Room",
+                explicit_brand="unknown",
+            ),
+            "Toshiba",
+        )
+        self.assertEqual(resolve_device_brand(0xE1, "unknown"), "Comfee / Midea")
+        self.assertEqual(resolve_device_brand(0xAC, "unknown"), "Midea ecosystem")
+
+    def test_cloud_options_match_dependency(self) -> None:
+        self.assertEqual(
+            set(config_flow.CLOUD_OPTIONS),
+            set(config_flow.SUPPORTED_CLOUDS),
+        )
+        self.assertTrue(all(config_flow.CLOUD_OPTIONS.values()))
+
+    def test_writable_profiles_match_boolean_driver_attributes(self) -> None:
+        for device_type, profile in DEVICE_PROFILES.items():
+            module_name = (
+                f"midealocal.devices.{'x' if device_type < 0xA0 else ''}"
+                f"{device_type:02x}"
+            )
+            module = import_module(module_name)
+            driver_attributes = {
+                str(attribute) for attribute in module.DeviceAttributes
+            }
+            self.assertTrue(
+                profile.writable_attributes.issubset(driver_attributes),
+                f"Unknown control in profile 0x{device_type:02X}",
+            )
+
+            device = device_selector(
+                name="Test appliance",
+                device_id=1,
+                device_type=device_type,
+                ip_address="192.0.2.10",
+                port=6444,
+                token="00" * 64,
+                key="00" * 32,
+                device_protocol=ProtocolVersion.V3,
+                model="test",
+                subtype=0,
+                customize="",
+            )
+            initial_attributes = {
+                str(attribute): value for attribute, value in device.attributes.items()
+            }
+            for attribute in profile.writable_attributes:
+                self.assertIn(attribute, initial_attributes)
+                self.assertTrue(
+                    initial_attributes[attribute] is None
+                    or isinstance(initial_attributes[attribute], bool),
+                    f"Non-boolean control {attribute} in 0x{device_type:02X}",
+                )
+                self.assertFalse(
+                    attribute_hint(attribute).name_vi.startswith("Thông số "),
+                    f"Missing Vietnamese control name for {attribute}",
+                )
+
+    def test_known_false_or_enum_controls_are_not_writable(self) -> None:
+        forbidden_controls = {
+            0xB3: {"lock"},
+            0xB8: {"carpet_switch", "uv_switch", "voice_switch", "wifi_switch"},
+            0xCD: {"dual_heat", "eco", "elec_heat", "heat"},
+            0xCF: {"defrost", "freeze"},
+            0xFC: {"screen_display"},
+            0xFD: {"screen_display"},
+        }
+        for device_type, forbidden in forbidden_controls.items():
+            self.assertTrue(
+                DEVICE_PROFILES[device_type].writable_attributes.isdisjoint(forbidden),
+                f"Unsafe controls enabled for 0x{device_type:02X}",
+            )
 
     def test_cycle_controls_are_disabled_by_default(self) -> None:
         self.assertFalse(
@@ -267,23 +428,49 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
             CONF_SUBTYPE: 0,
         }
 
+    @staticmethod
+    def _entry(candidate: dict[str, object]) -> ConfigEntry:
+        return ConfigEntry(
+            created_at=datetime.now(UTC),
+            data=candidate,
+            discovery_keys=MappingProxyType({}),
+            domain=DOMAIN,
+            minor_version=0,
+            modified_at=datetime.now(UTC),
+            options=None,
+            source="user",
+            state=ConfigEntryState.SETUP_IN_PROGRESS,
+            subentries_data=None,
+            title=str(candidate[CONF_NAME]),
+            unique_id=str(candidate[CONF_DEVICE_ID]),
+            version=1,
+        )
+
     async def test_cloud_step_does_not_store_account_password(self) -> None:
         flow = self._flow()
         with patch.object(
             flow,
             "_async_cloud_candidates",
             AsyncMock(return_value=[self._candidate()]),
-        ):
+        ) as candidates:
             result = await flow.async_step_cloud(
                 {
                     CONF_ACCOUNT: "owner@example.invalid",
                     CONF_PASSWORD: "test-password",
+                    CONF_CLOUD_NAME: "NetHome Plus",
                     CONF_IP_ADDRESS: "192.0.2.10",
                 },
             )
+        candidates.assert_awaited_once_with(
+            "owner@example.invalid",
+            "test-password",
+            "192.0.2.10",
+            "NetHome Plus",
+        )
         self.assertEqual(result["type"].value, "create_entry")
         self.assertNotIn(CONF_ACCOUNT, result["data"])
         self.assertNotIn(CONF_PASSWORD, result["data"])
+        self.assertNotIn(CONF_CLOUD_NAME, result["data"])
         self.assertEqual(result["data"][CONF_MODEL], "760EY095")
 
     async def test_cloud_candidate_flow_with_mock_cloud(self) -> None:
@@ -327,6 +514,306 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0][CONF_MODEL], "760EY095")
         self.assertEqual(candidates[0]["key_method"], 1)
+
+    async def test_cloud_candidate_supports_ac_and_alternate_cloud(self) -> None:
+        flow = self._flow()
+        cloud = Mock()
+        cloud.login = AsyncMock(return_value=True)
+        cloud.list_appliances = AsyncMock(
+            return_value={
+                654321: {
+                    "brand": "unknown",
+                    "name": "Toshiba Living Room",
+                    "model": "AC-MODEL",
+                    "model_number": "7",
+                    "sn": "cloud-serial",
+                },
+            },
+        )
+        cloud.get_cloud_keys = AsyncMock(
+            return_value={"unknown": {"token": "00" * 64, "key": "00" * 32}},
+        )
+        local = {
+            654321: {
+                "type": 0xAC,
+                "ip_address": "192.0.2.20",
+                "port": 6444,
+                "protocol": 3,
+                "model": "",
+                "mac": None,
+                "sn": None,
+            },
+            999999: {
+                "type": 0xA0,
+                "ip_address": "192.0.2.30",
+            },
+        }
+        with (
+            patch.object(config_flow, "_discover_devices", return_value=local),
+            patch.object(config_flow, "async_get_clientsession", return_value=Mock()),
+            patch.object(
+                config_flow,
+                "get_midea_cloud",
+                return_value=cloud,
+            ) as get_cloud,
+            patch.object(config_flow, "_validate_candidate", return_value=True),
+        ):
+            candidates = await flow._async_cloud_candidates(
+                "owner@example.invalid",
+                "test-password",
+                None,
+                "Midea Air",
+            )
+
+        get_cloud.assert_called_once_with(
+            "Midea Air",
+            get_cloud.call_args.args[1],
+            "owner@example.invalid",
+            "test-password",
+        )
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0][CONF_TYPE], 0xAC)
+        self.assertEqual(candidates[0][CONF_MODEL], "AC-MODEL")
+        self.assertEqual(candidates[0][CONF_SERIAL_NUMBER], "cloud-serial")
+        self.assertEqual(candidates[0][CONF_KEY_METHOD], 0)
+        self.assertEqual(candidates[0][CONF_BRAND], "Toshiba")
+
+    async def test_meiju_cloud_lists_every_home(self) -> None:
+        cloud = Mock()
+        cloud.list_home = AsyncMock(return_value={1: "Home", 2: "Office"})
+        cloud.list_appliances = AsyncMock(
+            side_effect=[{1: {"name": "One"}}, {2: {"name": "Two"}}],
+        )
+
+        appliances = (
+            await config_flow.ComfeeDishwasherConfigFlow._async_list_appliances(
+                cloud,
+                config_flow.MEIJU_CLOUD_NAME,
+            )
+        )
+
+        self.assertEqual(set(appliances or {}), {1, 2})
+        self.assertEqual(
+            [call.args[0] for call in cloud.list_appliances.await_args_list],
+            ["1", "2"],
+        )
+
+    async def test_manual_flow_preserves_selected_device_type(self) -> None:
+        flow = self._flow()
+        with patch.object(config_flow, "_validate_candidate", return_value=True):
+            result = await flow.async_step_manual(
+                {
+                    CONF_DEVICE_ID: 654321,
+                    CONF_TYPE: 0xAC,
+                    CONF_IP_ADDRESS: "192.0.2.20",
+                    CONF_PORT: 6444,
+                    CONF_PROTOCOL: 3,
+                    CONF_MODEL: "",
+                    CONF_NAME: "",
+                    CONF_BRAND: "Keystone",
+                    CONF_TOKEN: "00" * 64,
+                    CONF_KEY: "00" * 32,
+                    CONF_SUBTYPE: 0,
+                },
+            )
+
+        self.assertEqual(result["type"].value, "create_entry")
+        self.assertEqual(result["data"][CONF_TYPE], 0xAC)
+        self.assertEqual(result["data"][CONF_MODEL], "0xAC")
+        self.assertEqual(result["data"][CONF_NAME], "Air conditioner")
+        self.assertEqual(result["data"][CONF_BRAND], "Keystone")
+
+    async def test_manual_flow_reports_unsupported_type_separately(self) -> None:
+        flow = self._flow()
+        result = await flow.async_step_manual(
+            {
+                CONF_DEVICE_ID: 654321,
+                CONF_TYPE: 0xA0,
+                CONF_IP_ADDRESS: "192.0.2.20",
+                CONF_TOKEN: "00" * 64,
+                CONF_KEY: "00" * 32,
+            },
+        )
+
+        self.assertEqual(result["type"].value, "form")
+        self.assertEqual(result["errors"]["base"], "unsupported_device_type")
+
+    async def test_non_e1_entities_are_generic_and_unique(self) -> None:
+        candidate = {
+            **self._candidate(),
+            CONF_DEVICE_ID: 654321,
+            CONF_TYPE: 0xAC,
+            CONF_MODEL: "AC-MODEL",
+            CONF_NAME: "Living room AC",
+        }
+        entry = self._entry(candidate)
+        device = Mock()
+        device.device_id = 654321
+        device.available = True
+        device.attributes = {
+            "power": False,
+            "status": "idle",
+            "indoor_temperature": 24.5,
+            "water_pump_running": False,
+        }
+        coordinator = ComfeeDishwasherCoordinator(self.hass, entry, device)
+        coordinator.data = dict(coordinator._cached_data)
+        entry.runtime_data = coordinator
+
+        entities: list[object] = []
+        for platform in (binary_sensor, button, select, sensor, switch):
+            await platform.async_setup_entry(self.hass, entry, entities.extend)
+
+        unique_ids = [entity.unique_id for entity in entities]
+        self.assertEqual(len(unique_ids), len(set(unique_ids)))
+        self.assertIsNone(coordinator.usage)
+        self.assertFalse(
+            any(
+                isinstance(entity, button.ComfeeDishwasherStartButton)
+                for entity in entities
+            ),
+        )
+        self.assertFalse(
+            any(
+                isinstance(entity, select.ComfeeDishwasherSelect) for entity in entities
+            ),
+        )
+        self.assertTrue(
+            any(
+                isinstance(entity, sensor.ComfeeGenericAttributeSensor)
+                and entity.unique_id.endswith("_indoor_temperature")
+                for entity in entities
+            ),
+        )
+        self.assertTrue(
+            any(
+                isinstance(entity, binary_sensor.ComfeeGenericBinarySensor)
+                and entity.unique_id.endswith("_water_pump_running")
+                for entity in entities
+            ),
+        )
+        self.assertTrue(
+            any(
+                isinstance(entity, switch.ComfeeDishwasherSwitch)
+                and entity.unique_id.endswith("_power")
+                for entity in entities
+            ),
+        )
+        device.set_attribute.assert_not_called()
+        await coordinator.async_shutdown()
+
+    async def test_nullable_boolean_attribute_creates_binary_sensor(self) -> None:
+        candidate = {
+            **self._candidate(),
+            CONF_DEVICE_ID: 456789,
+            CONF_TYPE: 0xCF,
+            CONF_MODEL: "HEAT-PUMP",
+            CONF_NAME: "Heat pump",
+        }
+        entry = self._entry(candidate)
+        device = Mock()
+        device.device_id = 456789
+        device.available = True
+        device.attributes = {"compressor_status": None}
+        coordinator = ComfeeDishwasherCoordinator(self.hass, entry, device)
+        coordinator.data = dict(coordinator._cached_data)
+        entry.runtime_data = coordinator
+
+        entities: list[object] = []
+        await binary_sensor.async_setup_entry(self.hass, entry, entities.extend)
+
+        target = next(
+            entity
+            for entity in entities
+            if isinstance(entity, binary_sensor.ComfeeGenericBinarySensor)
+            and entity.unique_id.endswith("_compressor_status")
+        )
+        self.assertIsNone(target.is_on)
+        await coordinator.async_shutdown()
+
+    async def test_forbidden_controls_do_not_create_switches(self) -> None:
+        forbidden_controls = {
+            0xB3: {"lock"},
+            0xB8: {"carpet_switch", "uv_switch", "voice_switch", "wifi_switch"},
+            0xCD: {"dual_heat", "eco", "elec_heat", "heat"},
+            0xCF: {"defrost", "freeze"},
+            0xFC: {"screen_display"},
+            0xFD: {"screen_display"},
+        }
+        for index, (device_type, attributes) in enumerate(
+            forbidden_controls.items(),
+            start=1,
+        ):
+            candidate = {
+                **self._candidate(),
+                CONF_DEVICE_ID: 800000 + index,
+                CONF_TYPE: device_type,
+                CONF_MODEL: f"TYPE-{device_type:02X}",
+                CONF_NAME: f"Device {device_type:02X}",
+            }
+            entry = self._entry(candidate)
+            device = Mock()
+            device.device_id = candidate[CONF_DEVICE_ID]
+            device.available = True
+            device.attributes = dict.fromkeys(attributes, False)
+            coordinator = ComfeeDishwasherCoordinator(self.hass, entry, device)
+            coordinator.data = dict(coordinator._cached_data)
+            entry.runtime_data = coordinator
+
+            entities: list[object] = []
+            await switch.async_setup_entry(self.hass, entry, entities.extend)
+
+            self.assertFalse(
+                any(entity._entity_key in attributes for entity in entities),
+                f"Unsafe switch created for 0x{device_type:02X}",
+            )
+            await coordinator.async_shutdown()
+
+    async def test_x34_does_not_expose_e1_program_or_usage_entities(self) -> None:
+        candidate = {
+            **self._candidate(),
+            CONF_DEVICE_ID: 345678,
+            CONF_TYPE: 0x34,
+            CONF_MODEL: "X34",
+            CONF_NAME: "Sink dishwasher",
+        }
+        entry = self._entry(candidate)
+        device = Mock()
+        device.device_id = 345678
+        device.available = True
+        device.attributes = {
+            "power": False,
+            "status": "off",
+            "progress": "idle",
+        }
+        coordinator = ComfeeDishwasherCoordinator(self.hass, entry, device)
+        coordinator.data = dict(coordinator._cached_data)
+        entry.runtime_data = coordinator
+
+        entities: list[object] = []
+        for platform in (button, select, sensor):
+            await platform.async_setup_entry(self.hass, entry, entities.extend)
+
+        self.assertIsNone(coordinator.usage)
+        self.assertFalse(
+            any(
+                isinstance(entity, button.ComfeeDishwasherStartButton)
+                for entity in entities
+            ),
+        )
+        self.assertFalse(
+            any(
+                isinstance(entity, select.ComfeeDishwasherSelect) for entity in entities
+            ),
+        )
+        self.assertFalse(
+            any(
+                isinstance(entity, sensor.ComfeeDishwasherUsageSensor)
+                for entity in entities
+            ),
+        )
+        device.set_attribute.assert_not_called()
+        await coordinator.async_shutdown()
 
     async def test_setup_and_unload_close_socket(self) -> None:
         entry = ConfigEntry(
@@ -415,6 +902,19 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
         with self.assertRaises(HomeAssistantError):
             coordinator._validate_cycle_command()
         await coordinator.async_shutdown()
+
+    async def test_generic_boolean_and_text_errors_are_derived(self) -> None:
+        normal = ComfeeDishwasherCoordinator._with_derived_states(
+            {"error": False, "fault": "none", "wrong_operation": "0"},
+        )
+        self.assertFalse(normal["error_active"])
+        self.assertFalse(normal["operation_warning"])
+
+        active = ComfeeDishwasherCoordinator._with_derived_states(
+            {"error": True, "wrong_operation": "door open"},
+        )
+        self.assertTrue(active["error_active"])
+        self.assertTrue(active["operation_warning"])
 
     async def test_device_callbacks_are_coalesced_on_hass_loop(self) -> None:
         entry = ConfigEntry(

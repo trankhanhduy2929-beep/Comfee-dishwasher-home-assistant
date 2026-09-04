@@ -67,7 +67,7 @@ class ComfeeDishwasherReconnectButton(ComfeeDishwasherEntity, ButtonEntity):
         super().__init__(coordinator, "reconnect")
 
     async def async_press(self) -> None:
-        """Reconnect and query the dishwasher over LAN."""
+        """Reconnect the appliance over LAN."""
         await self.coordinator.async_reconnect()
 
 
@@ -76,12 +76,12 @@ async def async_setup_entry(
     entry: Any,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up dishwasher buttons."""
+    """Set up local appliance buttons."""
     coordinator: ComfeeDishwasherCoordinator = entry.runtime_data
     entities: list[ButtonEntity] = [
         ComfeeDishwasherRefreshButton(coordinator),
         ComfeeDishwasherReconnectButton(coordinator),
     ]
-    if "mode" in coordinator.data:
+    if coordinator.device_type == 0xE1 and "mode" in coordinator.data:
         entities.append(ComfeeDishwasherStartButton(coordinator))
     async_add_entities(entities)

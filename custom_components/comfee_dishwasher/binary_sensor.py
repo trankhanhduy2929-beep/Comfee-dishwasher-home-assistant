@@ -1,4 +1,4 @@
-"""Binary sensors for a Comfee dishwasher."""
+"""Binary sensors for supported Comfee/Midea-family appliances."""
 
 from typing import Any
 
@@ -11,7 +11,13 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .attribute_catalog import (
+    DEFAULT_ENABLED_BINARY_KEYS,
+    attribute_hint,
+    is_binary_attribute,
+)
 from .coordinator import ComfeeDishwasherCoordinator
+from .device_profiles import DISHWASHER_TYPES, writable_attributes_for
 from .entity import ComfeeDishwasherEntity
 
 DERIVED_SOURCE_KEYS = {
@@ -97,15 +103,35 @@ async def async_setup_entry(
     entry: Any,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up dishwasher binary sensors."""
+    """Set up appliance binary sensors."""
     coordinator: ComfeeDishwasherCoordinator = entry.runtime_data
-    async_add_entities(
+    data = coordinator.data or {}
+    if coordinator.device_type in DISHWASHER_TYPES:
+        descriptions = BINARY_SENSOR_DESCRIPTIONS
+    else:
+        shared_keys = {"error_active", "operation_warning", "local_connection"}
+        descriptions = tuple(
+            description
+            for description in BINARY_SENSOR_DESCRIPTIONS
+            if description.key in shared_keys
+        )
+    entities: list[BinarySensorEntity] = [
         ComfeeDishwasherBinarySensor(coordinator, description)
-        for description in BINARY_SENSOR_DESCRIPTIONS
-        if description.key in coordinator.data
-        or DERIVED_SOURCE_KEYS.get(description.key) in coordinator.data
+        for description in descriptions
+        if description.key in data
+        or DERIVED_SOURCE_KEYS.get(description.key) in data
         or description.key == "local_connection"
+    ]
+    known_keys = {description.key for description in descriptions}
+    writable_keys = writable_attributes_for(coordinator.device_type)
+    entities.extend(
+        ComfeeGenericBinarySensor(coordinator, str(key))
+        for key, value in data.items()
+        if str(key) not in known_keys
+        and str(key) not in writable_keys
+        and is_binary_attribute(key, value)
     )
+    async_add_entities(entities)
 
 
 class ComfeeDishwasherBinarySensor(ComfeeDishwasherEntity, BinarySensorEntity):
@@ -139,7 +165,7 @@ class ComfeeDishwasherBinarySensor(ComfeeDishwasherEntity, BinarySensorEntity):
                 and not isinstance(source_value, bool)
                 else None
             )
-        value = self.coordinator.data.get(self.entity_description.key)
+        value = (self.coordinator.data or {}).get(self.entity_description.key)
         return value if isinstance(value, bool) else None
 
     @property
@@ -148,3 +174,46 @@ class ComfeeDishwasherBinarySensor(ComfeeDishwasherEntity, BinarySensorEntity):
         if self.entity_description.key == "local_connection":
             return True
         return super().available
+
+
+class ComfeeGenericBinarySensor(ComfeeDishwasherEntity, BinarySensorEntity):
+    """Expose a read-only boolean attribute from any supported driver."""
+
+    def __init__(
+        self,
+        coordinator: ComfeeDishwasherCoordinator,
+        attribute: str,
+    ) -> None:
+        """Initialize a generic binary sensor."""
+        super().__init__(coordinator, attribute)
+        self._attribute = attribute
+        self._attr_entity_registry_enabled_default = (
+            attribute in DEFAULT_ENABLED_BINARY_KEYS
+        )
+        if attribute not in DEFAULT_ENABLED_BINARY_KEYS:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        hint = attribute_hint(attribute)
+        self._attr_name = hint.name_vi
+        self._attr_icon = hint.icon
+        classes = {
+            "opening": BinarySensorDeviceClass.OPENING,
+            "problem": BinarySensorDeviceClass.PROBLEM,
+            "running": BinarySensorDeviceClass.RUNNING,
+            "motion": BinarySensorDeviceClass.MOTION,
+        }
+        if hint.binary_device_class in classes:
+            self._attr_device_class = classes[hint.binary_device_class]
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return the cached boolean value."""
+        value = (self.coordinator.data or {}).get(self._attribute)
+        return value if isinstance(value, bool) else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str]:
+        """Expose the underlying local-protocol attribute name."""
+        return {
+            "thuoc_tinh_giao_thuc": self._attribute,
+            "ma_loai_thiet_bi": f"0x{self.coordinator.device_type:02X}",
+        }

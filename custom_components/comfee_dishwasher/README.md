@@ -1,42 +1,33 @@
-# Comfee Dishwasher
+# Comfee / Midea Local Appliances
 
-Custom integration cho Home Assistant, kết nối máy rửa bát Comfee/Midea loại
-thiết bị `0xE1` bằng giao thức local của `midea-local`.
+Custom integration cho Home Assistant, kết nối thiết bị thuộc hệ sinh thái
+Midea bằng giao thức LAN của `midea-local 10.1.0`.
 
-- Cloud chỉ được dùng lúc cấu hình để lấy token/key LAN.
-- Sau khi cấu hình, trạng thái và lệnh điều khiển đi thẳng qua mạng nội bộ,
-  thường qua TCP `6444`.
-- Một thread nền duy nhất nhận thông báo LAN và tự cập nhật entity; truy vấn
-  khoảng 30 giây là dự phòng khi firmware không phát đủ thông báo.
-- Callback được gộp trước khi báo Home Assistant, còn mọi I/O và teardown chạy
-  ngoài event loop để tránh làm nặng hoặc treo Home Assistant.
-- Mật khẩu tài khoản MSmartHome không được lưu trong config entry.
-- Integration hiển thị các trường E1 mà máy trả về, gồm UV, sấy, van cấp nước,
-  mã chẩn đoán và cảnh báo thao tác nếu firmware có hỗ trợ.
-- Nút cập nhật trạng thái và kết nối lại chỉ đọc qua LAN, không gửi lệnh vận
-  hành.
-- Chỉ ba điều khiển ghi LAN đã được xác nhận an toàn: nguồn, khóa trẻ em và
-  bảo quản/sấy khí.
-- Chọn chương trình và nút khởi động bị tắt mặc định vì một số firmware E1 có
-  thể bắt đầu chu trình ngay khi nhận lệnh chọn chương trình.
-- Thêm sáu sensor tiêu thụ **ước tính**: điện/nước lần rửa gần nhất, tổng hôm
-  nay và tổng tháng này. Tracker dùng bộ nhớ cục bộ của Home Assistant, không
-  gọi cloud.
+- Giữ domain `comfee_dishwasher` để tương thích cấu hình Comfee E1 cũ.
+- Hỗ trợ discovery cho 36 loại driver: điều hòa, quạt, lọc khí, hút ẩm, tạo
+  ẩm, giặt/sấy, tủ lạnh, bình nóng lạnh, thiết bị bếp, robot hút bụi, máy lọc
+  nước và hai loại máy rửa bát `0xE1`/`0x34`.
+- Hỗ trợ lấy token/key qua MSmartHome/SmartHome, NetHome Plus, Midea Air/Arctic
+  King, Ariston Clima và Midea Meiju.
+- Cloud chỉ dùng trong config flow; tài khoản và mật khẩu không được lưu.
+- Sau khi cấu hình, trạng thái và lệnh đã cho phép đi trực tiếp qua LAN.
+- Một thread nền trên mỗi thiết bị nhận thông báo và truy vấn dự phòng. Callback
+  được gộp trước khi cập nhật entity để tránh làm nặng Home Assistant.
+- Thiết bị ngoài E1 dùng sensor/binary sensor generic. Thuộc tính chẩn đoán hiếm
+  bị disable mặc định để giảm dữ liệu Recorder.
+- Chỉ thuộc tính boolean trong allow-list của đúng driver mới được tạo switch;
+  switch generic bị disable mặc định.
+- Chưa có giao diện chuyên dụng `climate`, `fan`, `vacuum`, `light` hoặc
+  `water_heater`; các loại đó hiện ưu tiên đọc trạng thái an toàn qua entity
+  generic.
 
-Các khóa sensor tương ứng là `estimated_energy_last_cycle`,
-`estimated_water_last_cycle`, `estimated_energy_today`,
-`estimated_water_today`, `estimated_energy_this_month` và
-`estimated_water_this_month`.
+Máy rửa bát E1 giữ toàn bộ entity riêng, select/start an toàn và sáu sensor điện
+nước **ước tính** cho lần rửa gần nhất, hôm nay và tháng này. Máy rửa bát `0x34`
+không dùng chương trình hoặc định mức E1.
 
-Lưu ý: firmware E1 `760EY095` không cung cấp số kWh hoặc lít thực tế qua LAN.
-Các sensor tiêu thụ cộng định mức tham khảo của profile E1 `7600024L` khi máy
-chuyển sang `complete`; đây chưa phải thông số đã xác nhận riêng cho `760EY095`.
-Chu kỳ bị hủy hoặc lỗi không được cộng. Đây là ước tính theo chương trình,
-không phải số đo công tơ. Nếu chương trình chưa có định mức, sensor lần rửa
-gần nhất sẽ là `Unknown` và tổng không thay đổi. Chu kỳ diễn ra hoàn toàn khi
-Home Assistant tắt sẽ không thể được ghi nhận.
+Firmware E1 `760EY095` không cung cấp số kWh/lít thực tế qua LAN. Tracker chỉ
+cộng định mức tham khảo của profile `7600024L` khi máy báo hoàn tất; chu kỳ lỗi,
+hủy hoặc chương trình chưa có định mức không được cộng.
 
-Hướng dẫn cài đặt và sử dụng nằm trong README ở thư mục gốc repository.
-
-Không cấu hình cùng một máy đồng thời trong integration này và integration
-Midea tích hợp sẵn của Home Assistant.
+Xem README ở thư mục gốc repository để biết bảng loại thiết bị, mức hỗ trợ,
+cảnh báo điều khiển và hướng dẫn cài HACS.

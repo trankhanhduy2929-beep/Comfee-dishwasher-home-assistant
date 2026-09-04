@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.0 — 2026-09-04
+
+- Expand discovery and local state support from E1 dishwashers to all 36
+  appliance drivers shipped by `midea-local 10.1.0`.
+- Add generic Vietnamese sensor and binary-sensor entities for air
+  conditioners, laundry appliances, refrigerators, fans, air/water treatment,
+  water heaters, cooking appliances, robot vacuums and other supported types.
+- Add conservative per-device-type switch allow-lists; unfamiliar controls are
+  disabled by default and no command is sent during setup or validation.
+- Add account setup for SmartHome/MSmartHome, NetHome Plus, Midea Air, Ariston
+  Clima and Midea Meiju, while continuing to store only LAN credentials.
+- Preserve the existing `comfee_dishwasher` domain and all verified E1 entities,
+  usage estimates and safety guards.
+- Keep E1-only program/start/usage behavior away from sink dishwasher type
+  `0x34` and every non-E1 device.
+- Improve brand detection from textual cloud/device metadata without guessing
+  unstable manufacturer codes, including Arctic King metadata, without letting
+  the selected cloud/app name override the appliance's actual brand; preserve
+  valid explicit OEM brand names even when they are not yet in the alias table.
+- Upgrade `midea-local` to `10.1.0` for current reconnect and protocol fixes.
+- Add multi-device contract tests and retain the flat HACS release ZIP layout.
+
 ## 0.5.1 — 2026-09-04
 
 - Fix the HACS release ZIP layout so files are extracted directly into

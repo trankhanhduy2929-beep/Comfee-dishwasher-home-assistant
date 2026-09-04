@@ -1,20 +1,24 @@
-"""Constants for the Comfee dishwasher integration."""
+"""Constants for the Comfee/Midea local appliance integration."""
 
 from enum import IntEnum
 from typing import Final, NamedTuple
 
 DOMAIN = "comfee_dishwasher"
 CONF_ACCOUNT = "account"
+CONF_CLOUD_NAME = "cloud_name"
 CONF_KEY = "key"
 CONF_SUBTYPE = "subtype"
 CONF_MAC = "mac"
 CONF_SERIAL_NUMBER = "serial_number"
 CONF_KEY_METHOD = "key_method"
 CONF_DEVICE = "device"
+CONF_BRAND = "brand"
+CONF_MANUFACTURER_CODE = "manufacturer_code"
 
 DEVICE_TYPE_DISHWASHER = 0xE1
 DEFAULT_PORT = 6444
 DEFAULT_PROTOCOL = 3
+DEFAULT_CLOUD_NAME = "SmartHome"
 WRITABLE_ATTRIBUTES = frozenset({"power", "child_lock", "storage"})
 
 ESTIMATED_ENERGY_LAST_CYCLE = "estimated_energy_last_cycle"

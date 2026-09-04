@@ -1,4 +1,4 @@
-"""Diagnostics for a Comfee dishwasher."""
+"""Diagnostics for a supported local appliance."""
 
 from typing import Any
 
@@ -40,7 +40,10 @@ async def async_get_config_entry_diagnostics(
             "port": coordinator.local_port,
             "protocol": coordinator.local_protocol,
             "last_update_success": coordinator.last_update_success,
-            "device_available": coordinator.data.get("local_connection", False),
+            "device_available": (coordinator.data or {}).get(
+                "local_connection",
+                False,
+            ),
         },
-        "device_attributes": dict(coordinator.data),
+        "device_attributes": dict(coordinator.data or {}),
     }

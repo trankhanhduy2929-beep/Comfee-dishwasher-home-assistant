@@ -1,13 +1,13 @@
-"""State and command coordination for a Comfee dishwasher."""
+"""State and command coordination for a supported local appliance."""
 
 import logging
 from collections.abc import Callable, Mapping
 from datetime import datetime
 from threading import Lock, RLock, Thread
-from typing import Any, cast
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_DEVICE_ID, CONF_PORT, CONF_PROTOCOL
+from homeassistant.const import CONF_DEVICE_ID, CONF_PORT, CONF_PROTOCOL, CONF_TYPE
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.event import async_track_time_change
@@ -15,7 +15,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from midealocal.device import MideaDevice
 from midealocal.devices.e1 import MideaE1Device
 
-from .const import DOMAIN, WRITABLE_ATTRIBUTES
+from .const import DOMAIN
+from .device_profiles import get_device_profile, writable_attributes_for
 from .usage import DishwasherUsageTracker
 
 _LOGGER = logging.getLogger(__package__)
@@ -24,7 +25,7 @@ _MAX_PENDING_USAGE_UPDATES = 64
 
 
 class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Bridge the local device thread to Home Assistant safely."""
+    """Bridge one local Midea-family device thread to Home Assistant safely."""
 
     def __init__(
         self,
@@ -34,6 +35,8 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     ) -> None:
         """Initialize the coordinator."""
         self.device = device
+        self.device_type = int(entry.data.get(CONF_TYPE, 0xE1))
+        self.profile = get_device_profile(self.device_type)
         self._device_lock = RLock()
         self._pending_lock = Lock()
         self._pending_updates: dict[str, Any] = {}
@@ -52,28 +55,35 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else {}
         )
         initial_state["local_connection"] = bool(self.device.available)
-        self.usage = DishwasherUsageTracker(
-            hass,
-            str(entry.data.get(CONF_DEVICE_ID, self.device.device_id)),
+        self.usage = (
+            DishwasherUsageTracker(
+                hass,
+                str(entry.data.get(CONF_DEVICE_ID, self.device.device_id)),
+            )
+            if self.device_type == 0xE1
+            else None
         )
-        initial_state.update(self.usage.sensor_values)
+        if self.usage is not None:
+            initial_state.update(self.usage.sensor_values)
         self._cached_data = self._with_derived_states(initial_state)
         super().__init__(
             hass,
             logger=_LOGGER,
             config_entry=entry,
-            name="Comfee dishwasher",
+            name="Comfee/Midea local appliance",
             update_method=self._async_update_data,
         )
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Return the latest state already received by the local thread."""
-        if self.usage.rollover():
+        if self.usage is not None and self.usage.rollover():
             self._cached_data.update(self.usage.sensor_values)
         return dict(self._cached_data)
 
     async def async_initialize_usage(self) -> None:
         """Load persisted usage before entities are created."""
+        if self.usage is None:
+            return
         await self.usage.async_initialize(self._cached_data)
         self._cached_data = {
             **self._cached_data,
@@ -91,13 +101,14 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.device.register_update(self._device_update_callback)
             self._callback_registered = True
             self.device.daemon = True
-            self._remove_usage_rollover = async_track_time_change(
-                self.hass,
-                self._async_rollover_usage,
-                hour=0,
-                minute=0,
-                second=0,
-            )
+            if self.usage is not None:
+                self._remove_usage_rollover = async_track_time_change(
+                    self.hass,
+                    self._async_rollover_usage,
+                    hour=0,
+                    minute=0,
+                    second=0,
+                )
             await self.hass.async_add_executor_job(self.device.open)
         except Exception:
             if self._callback_registered:
@@ -111,7 +122,7 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _handle_device_update(self, status: Mapping[Any, Any]) -> None:
         """Queue a short device-thread update for the Home Assistant loop."""
         if not isinstance(status, Mapping):
-            _LOGGER.debug("Ignoring malformed dishwasher update")
+            _LOGGER.debug("Ignoring malformed local-appliance update")
             return
         update = self._normalize_device_update(status)
         if not update:
@@ -120,9 +131,15 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self._closing:
                 return
             self._pending_updates.update(update)
-            usage_update = {
-                key: value for key, value in update.items() if key in _USAGE_UPDATE_KEYS
-            }
+            usage_update = (
+                {
+                    key: value
+                    for key, value in update.items()
+                    if key in _USAGE_UPDATE_KEYS
+                }
+                if self.usage is not None
+                else {}
+            )
             if usage_update:
                 self._pending_usage_updates.append(usage_update)
                 if len(self._pending_usage_updates) > _MAX_PENDING_USAGE_UPDATES:
@@ -166,13 +183,14 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not updates:
             return
         base_data = dict(self._cached_data)
-        if usage_updates:
+        if usage_updates and self.usage is not None:
             usage_state = dict(base_data)
             for usage_update in usage_updates:
                 usage_state.update(usage_update)
                 self.usage.process_state(usage_state)
         data = self._with_derived_states({**base_data, **updates})
-        data.update(self.usage.sensor_values)
+        if self.usage is not None:
+            data.update(self.usage.sensor_values)
         self._cached_data = data
         if data == self.data and self.last_update_success:
             return
@@ -181,7 +199,7 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @callback
     def _async_rollover_usage(self, now: datetime) -> None:
         """Publish local day and month resets without polling the appliance."""
-        if self._closing or not self.usage.rollover(now):
+        if self._closing or self.usage is None or not self.usage.rollover(now):
             return
         data = {**self._cached_data, **self.usage.sensor_values}
         self._cached_data = data
@@ -192,22 +210,45 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _with_derived_states(attributes: dict[str, Any]) -> dict[str, Any]:
         """Add safe diagnostic states derived from the complete cache."""
         state = dict(attributes)
-        error_code = state.get("error_code")
-        wrong_operation = state.get("wrong_operation")
         state["error_active"] = bool(
             state.get("status") == "error"
-            or (
-                isinstance(error_code, (int, float))
-                and not isinstance(error_code, bool)
-                and error_code != 0
+            or ComfeeDishwasherCoordinator._diagnostic_value_is_active(
+                state.get("error_code"),
+            )
+            or ComfeeDishwasherCoordinator._diagnostic_value_is_active(
+                state.get("error"),
+            )
+            or ComfeeDishwasherCoordinator._diagnostic_value_is_active(
+                state.get("fault"),
             )
         )
-        state["operation_warning"] = bool(
-            isinstance(wrong_operation, (int, float))
-            and not isinstance(wrong_operation, bool)
-            and wrong_operation != 0
+        state["operation_warning"] = (
+            ComfeeDishwasherCoordinator._diagnostic_value_is_active(
+                state.get("wrong_operation"),
+            )
         )
         return state
+
+    @staticmethod
+    def _diagnostic_value_is_active(value: Any) -> bool:
+        """Normalize common numeric, boolean and text diagnostic values."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value != 0
+        if isinstance(value, str):
+            normalized = value.strip().casefold().replace("_", " ")
+            return normalized not in {
+                "",
+                "0",
+                "false",
+                "no error",
+                "none",
+                "normal",
+                "ok",
+                "unknown",
+            }
+        return False
 
     async def async_request_device_refresh(self) -> None:
         """Ask the local service thread for a fresh read-only state."""
@@ -230,9 +271,14 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._mark_unavailable_blocking()
                 raise
 
-    async def async_set_attribute(self, attribute: str, value: bool) -> None:
-        """Set a boolean dishwasher attribute."""
-        if attribute not in WRITABLE_ATTRIBUTES:
+    async def async_set_attribute(
+        self,
+        attribute: str,
+        value: bool | float | str,
+    ) -> None:
+        """Set one explicitly allow-listed attribute outside the event loop."""
+        allowed = writable_attributes_for(self.device_type)
+        if attribute not in allowed or attribute not in self._cached_data:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="unsupported_control",
@@ -241,34 +287,43 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_set_mode(self, mode: int) -> None:
         """Select and start a dishwasher program."""
+        if not isinstance(self.device, MideaE1Device):
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="unsupported_control",
+            )
         self._validate_cycle_command()
-        device = cast(MideaE1Device, self.device)
-        await self._async_command(device.set_work_mode, mode)
+        await self._async_command(self.device.set_work_mode, mode)
 
     async def async_start_work(self) -> None:
         """Start the currently selected dishwasher program."""
+        if not isinstance(self.device, MideaE1Device):
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="unsupported_control",
+            )
         self._validate_cycle_command()
-        if self.data.get("mode") in (None, "none"):
+        if not self.data or self.data.get("mode") in (None, "none"):
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="program_not_selected",
             )
-        device = cast(MideaE1Device, self.device)
-        await self._async_command(device.start_work)
+        await self._async_command(self.device.start_work)
 
     def _validate_cycle_command(self) -> None:
         """Reject an unsafe cycle command before it reaches the appliance."""
-        if not self.data.get("power"):
+        data = self.data or self._cached_data
+        if not data.get("power"):
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="device_off",
             )
-        if self.data.get("door"):
+        if data.get("door"):
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="door_open",
             )
-        if self.data.get("status") == "running":
+        if data.get("status") == "running":
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="cycle_running",
@@ -343,7 +398,8 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._remove_usage_rollover is not None:
             self._remove_usage_rollover()
             self._remove_usage_rollover = None
-        await self.usage.async_shutdown()
+        if self.usage is not None:
+            await self.usage.async_shutdown()
         await self.async_shutdown()
         await self.hass.async_add_executor_job(self.close)
 

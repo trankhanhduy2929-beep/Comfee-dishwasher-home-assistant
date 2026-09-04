@@ -29,4 +29,4 @@ jobs:
           dist/comfee_dishwasher.zip
           dist/comfee_dishwasher.zip.sha256
           --generate-notes
-          --title "Comfee Dishwasher ${GITHUB_REF_NAME}"
+          --title "Comfee / Midea Local Appliances ${GITHUB_REF_NAME}"

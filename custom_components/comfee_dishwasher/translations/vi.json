@@ -2,55 +2,61 @@
   "config": {
     "step": {
       "user": {
-        "title": "Máy rửa bát Comfee",
-        "description": "Chọn tự dò bằng tài khoản cloud hoặc nhập thông tin LAN thủ công.",
+        "title": "Thiết bị Comfee / Midea qua LAN",
+        "description": "Thêm thiết bị được hỗ trợ bằng tài khoản ứng dụng thuộc hệ Midea hoặc nhập thông tin kết nối LAN thủ công.",
         "menu_options": {
-          "cloud": "Tự dò bằng tài khoản MSmartHome",
+          "cloud": "Tự dò bằng tài khoản ứng dụng của thiết bị",
           "manual": "Nhập token và key LAN"
         }
       },
       "cloud": {
-        "title": "Tài khoản MSmartHome",
-        "description": "Tài khoản chỉ được dùng trong lúc cài đặt để lấy key nội bộ. Mật khẩu không được lưu trong config entry.",
+        "title": "Tài khoản ứng dụng của thiết bị",
+        "description": "Chọn đúng ứng dụng/cloud đã dùng để đăng ký thiết bị. Tài khoản chỉ dùng lúc cài đặt để lấy key LAN và mật khẩu không được lưu.",
         "data": {
+          "cloud_name": "Ứng dụng / nhà cung cấp cloud",
           "account": "Email hoặc tài khoản",
           "password": "Mật khẩu",
-          "ip_address": "IP máy rửa bát (không bắt buộc)"
+          "ip_address": "IP thiết bị (không bắt buộc)"
         }
       },
       "select_device": {
-        "title": "Chọn máy rửa bát",
-        "description": "Chọn máy cần thêm vào Home Assistant.",
+        "title": "Chọn thiết bị",
+        "description": "Chọn một thiết bị LAN cần thêm. Chạy lại quy trình để thêm thiết bị khác.",
         "data": {
           "device": "Thiết bị"
         }
       },
       "manual": {
-        "title": "Thông tin LAN máy rửa bát",
-        "description": "Nhập token và key dạng hexadecimal lấy từ phiên MSmartHome được ủy quyền.",
+        "title": "Thông tin LAN của thiết bị",
+        "description": "Chọn đúng mã loại thiết bị rồi nhập token và key dạng hexadecimal lấy từ phiên ứng dụng thiết bị được ủy quyền.",
         "data": {
           "device_id": "Device ID",
           "ip_address": "Địa chỉ IP",
           "port": "Cổng TCP",
           "protocol": "Phiên bản giao thức",
+          "type": "Loại thiết bị",
+          "subtype": "Mã phụ của thiết bị",
           "model": "Model",
           "name": "Tên",
+          "brand": "Hãng (không bắt buộc)",
+          "manufacturer_code": "Mã nhà sản xuất (không bắt buộc)",
           "token": "Token",
           "key": "Key"
         }
       }
     },
     "error": {
-      "cloud_login_failed": "Đăng nhập MSmartHome thất bại.",
-      "device_not_found": "Không tìm thấy máy rửa bát E1 trong mạng LAN.",
-      "device_not_in_account": "Máy rửa bát tìm thấy không thuộc tài khoản MSmartHome này.",
+      "cloud_login_failed": "Không đăng nhập được tài khoản trên ứng dụng/cloud đã chọn.",
+      "device_not_found": "Không tìm thấy thiết bị LAN nào có driver được integration hỗ trợ.",
+      "device_not_in_account": "Không có thiết bị LAN tìm thấy nào thuộc tài khoản ứng dụng đã chọn.",
       "device_auth_failed": "Đã tìm thấy thiết bị nhưng không có key nào xác thực được.",
       "invalid_token": "Token và key phải là chuỗi hexadecimal không rỗng.",
-      "manual_auth_failed": "Thông tin LAN không xác thực được máy rửa bát.",
-      "setup_failed": "Cài đặt thất bại. Hãy kiểm tra tài khoản, mạng và trạng thái thiết bị."
+      "unsupported_device_type": "Mã loại này chưa có driver trong phiên bản midea-local đang dùng.",
+      "manual_auth_failed": "Thông tin LAN không xác thực được thiết bị.",
+      "setup_failed": "Cài đặt thất bại. Hãy kiểm tra tài khoản, mạng, mã loại và trạng thái thiết bị."
     },
     "abort": {
-      "already_configured": "Máy rửa bát này đã được cấu hình."
+      "already_configured": "Thiết bị này đã được cấu hình."
     }
   },
   "entity": {
@@ -254,13 +260,13 @@
       "message": "Hãy chọn chương trình rửa trước khi khởi động."
     },
     "unsupported_control": {
-      "message": "Điều khiển này chưa được giao thức E1 cục bộ hỗ trợ."
+      "message": "Điều khiển này chưa nằm trong danh sách lệnh LAN đã xác minh cho loại thiết bị này."
     },
     "command_failed": {
-      "message": "Không thể gửi lệnh cục bộ đến máy rửa bát."
+      "message": "Không thể gửi lệnh cục bộ đến thiết bị."
     },
     "local_connection_failed": {
-      "message": "Không thể kết nối máy rửa bát qua mạng nội bộ."
+      "message": "Không thể kết nối thiết bị qua mạng nội bộ."
     },
     "unsupported_program": {
       "message": "Chương trình rửa này không được máy hỗ trợ."
