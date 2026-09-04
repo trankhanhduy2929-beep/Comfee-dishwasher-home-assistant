@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 — 2026-09-04
+
+- Add estimated energy and water sensors for the last completed cycle, today
+  and the current month.
+- Count a cycle once on the local E1 `complete` transition and ignore cancel
+  and error states.
+- Persist usage totals across Home Assistant restarts and reset daily/monthly
+  totals in the Home Assistant local timezone.
+- Clearly mark values as fixed-program estimates because this E1 firmware does
+  not expose an actual energy or water meter.
+
 ## 0.4.0 — 2026-08-29
 
 - Keep one daemonized `midea-local` service thread as the only socket reader.

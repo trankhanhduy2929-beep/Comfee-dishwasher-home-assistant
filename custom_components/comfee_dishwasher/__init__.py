@@ -105,6 +105,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(_close_device)
     try:
+        await coordinator.async_initialize_usage()
         await coordinator.async_config_entry_first_refresh()
         await coordinator.async_start()
     except Exception as error:

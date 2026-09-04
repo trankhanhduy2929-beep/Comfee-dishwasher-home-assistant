@@ -2,20 +2,25 @@
 
 import logging
 from collections.abc import Callable, Mapping
+from datetime import datetime
 from threading import Lock, RLock, Thread
 from typing import Any, cast
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PORT, CONF_PROTOCOL
-from homeassistant.core import HomeAssistant
+from homeassistant.const import CONF_DEVICE_ID, CONF_PORT, CONF_PROTOCOL
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from midealocal.device import MideaDevice
 from midealocal.devices.e1 import MideaE1Device
 
 from .const import DOMAIN, WRITABLE_ATTRIBUTES
+from .usage import DishwasherUsageTracker
 
 _LOGGER = logging.getLogger(__package__)
+_USAGE_UPDATE_KEYS = frozenset({"status", "progress", "mode"})
+_MAX_PENDING_USAGE_UPDATES = 64
 
 
 class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -32,9 +37,11 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._device_lock = RLock()
         self._pending_lock = Lock()
         self._pending_updates: dict[str, Any] = {}
+        self._pending_usage_updates: list[dict[str, Any]] = []
         self._update_scheduled = False
         self._callback_registered = False
         self._closing = False
+        self._remove_usage_rollover: CALLBACK_TYPE | None = None
         self._device_update_callback = self._handle_device_update
         self.local_port = int(entry.data.get(CONF_PORT, 6444))
         self.local_protocol = int(entry.data.get(CONF_PROTOCOL, 3))
@@ -45,6 +52,11 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else {}
         )
         initial_state["local_connection"] = bool(self.device.available)
+        self.usage = DishwasherUsageTracker(
+            hass,
+            str(entry.data.get(CONF_DEVICE_ID, self.device.device_id)),
+        )
+        initial_state.update(self.usage.sensor_values)
         self._cached_data = self._with_derived_states(initial_state)
         super().__init__(
             hass,
@@ -56,20 +68,44 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Return the latest state already received by the local thread."""
+        if self.usage.rollover():
+            self._cached_data.update(self.usage.sensor_values)
         return dict(self._cached_data)
+
+    async def async_initialize_usage(self) -> None:
+        """Load persisted usage before entities are created."""
+        await self.usage.async_initialize(self._cached_data)
+        self._cached_data = {
+            **self._cached_data,
+            **self.usage.sensor_values,
+        }
 
     async def async_start(self) -> None:
         """Start the dependency's single background socket reader."""
         if self._callback_registered:
             return
-        self.device.register_update(self._device_update_callback)
-        self._callback_registered = True
-        self.device.daemon = True
+        await self.async_initialize_usage()
+        if self.data is not None and self._cached_data != self.data:
+            self.async_set_updated_data(dict(self._cached_data))
         try:
+            self.device.register_update(self._device_update_callback)
+            self._callback_registered = True
+            self.device.daemon = True
+            self._remove_usage_rollover = async_track_time_change(
+                self.hass,
+                self._async_rollover_usage,
+                hour=0,
+                minute=0,
+                second=0,
+            )
             await self.hass.async_add_executor_job(self.device.open)
         except Exception:
-            self.device.unregister_update(self._device_update_callback)
-            self._callback_registered = False
+            if self._callback_registered:
+                self.device.unregister_update(self._device_update_callback)
+                self._callback_registered = False
+            if self._remove_usage_rollover is not None:
+                self._remove_usage_rollover()
+                self._remove_usage_rollover = None
             raise
 
     def _handle_device_update(self, status: Mapping[Any, Any]) -> None:
@@ -84,6 +120,13 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self._closing:
                 return
             self._pending_updates.update(update)
+            usage_update = {
+                key: value for key, value in update.items() if key in _USAGE_UPDATE_KEYS
+            }
+            if usage_update:
+                self._pending_usage_updates.append(usage_update)
+                if len(self._pending_usage_updates) > _MAX_PENDING_USAGE_UPDATES:
+                    del self._pending_usage_updates[:-_MAX_PENDING_USAGE_UPDATES]
             if self._update_scheduled:
                 return
             self._update_scheduled = True
@@ -92,6 +135,7 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except RuntimeError:
             with self._pending_lock:
                 self._pending_updates.clear()
+                self._pending_usage_updates.clear()
                 self._update_scheduled = False
 
     @staticmethod
@@ -111,18 +155,38 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         with self._pending_lock:
             if self._closing:
                 self._pending_updates.clear()
+                self._pending_usage_updates.clear()
                 self._update_scheduled = False
                 return
             updates = self._pending_updates
             self._pending_updates = {}
+            usage_updates = self._pending_usage_updates
+            self._pending_usage_updates = []
             self._update_scheduled = False
         if not updates:
             return
-        data = self._with_derived_states({**self._cached_data, **updates})
+        base_data = dict(self._cached_data)
+        if usage_updates:
+            usage_state = dict(base_data)
+            for usage_update in usage_updates:
+                usage_state.update(usage_update)
+                self.usage.process_state(usage_state)
+        data = self._with_derived_states({**base_data, **updates})
+        data.update(self.usage.sensor_values)
         self._cached_data = data
         if data == self.data and self.last_update_success:
             return
         self.async_set_updated_data(dict(data))
+
+    @callback
+    def _async_rollover_usage(self, now: datetime) -> None:
+        """Publish local day and month resets without polling the appliance."""
+        if self._closing or not self.usage.rollover(now):
+            return
+        data = {**self._cached_data, **self.usage.sensor_values}
+        self._cached_data = data
+        if data != self.data or not self.last_update_success:
+            self.async_set_updated_data(dict(data))
 
     @staticmethod
     def _with_derived_states(attributes: dict[str, Any]) -> dict[str, Any]:
@@ -276,6 +340,10 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._callback_registered:
             self.device.unregister_update(self._device_update_callback)
             self._callback_registered = False
+        if self._remove_usage_rollover is not None:
+            self._remove_usage_rollover()
+            self._remove_usage_rollover = None
+        await self.usage.async_shutdown()
         await self.async_shutdown()
         await self.hass.async_add_executor_job(self.close)
 

@@ -208,6 +208,24 @@
       },
       "storage_remaining": {
         "name": "Thời gian bảo quản / sấy khí còn lại"
+      },
+      "estimated_energy_last_cycle": {
+        "name": "Điện ước tính — lần rửa gần nhất"
+      },
+      "estimated_water_last_cycle": {
+        "name": "Nước ước tính — lần rửa gần nhất"
+      },
+      "estimated_energy_today": {
+        "name": "Điện ước tính — hôm nay"
+      },
+      "estimated_water_today": {
+        "name": "Nước ước tính — hôm nay"
+      },
+      "estimated_energy_this_month": {
+        "name": "Điện ước tính — tháng này"
+      },
+      "estimated_water_this_month": {
+        "name": "Nước ước tính — tháng này"
       }
     },
     "switch": {

@@ -44,12 +44,20 @@ from custom_components.comfee_dishwasher.const import (
     CONF_KEY,
     CONF_SUBTYPE,
     DOMAIN,
+    ESTIMATED_ENERGY_LAST_CYCLE,
+    ESTIMATED_ENERGY_THIS_MONTH,
+    ESTIMATED_ENERGY_TODAY,
+    ESTIMATED_WATER_LAST_CYCLE,
+    ESTIMATED_WATER_THIS_MONTH,
+    ESTIMATED_WATER_TODAY,
     MODE_NAMES,
+    USAGE_SENSOR_KEYS,
     WRITABLE_ATTRIBUTES,
 )
 from custom_components.comfee_dishwasher.coordinator import (
     ComfeeDishwasherCoordinator,
 )
+from custom_components.comfee_dishwasher.usage import DishwasherUsageTracker
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "comfee_dishwasher"
@@ -61,7 +69,7 @@ class ComponentContractTests(TestCase):
     def test_manifest_contract(self) -> None:
         manifest = json.loads((COMPONENT / "manifest.json").read_text())
         self.assertEqual(manifest["domain"], "comfee_dishwasher")
-        self.assertEqual(manifest["version"], "0.4.0")
+        self.assertEqual(manifest["version"], "0.5.0")
         self.assertEqual(manifest["requirements"], ["midea-local==10.0.1"])
         self.assertEqual(manifest["iot_class"], "local_polling")
         self.assertTrue(manifest["config_flow"])
@@ -128,6 +136,10 @@ class ComponentContractTests(TestCase):
 
     def test_only_verified_boolean_controls_are_writable(self) -> None:
         self.assertEqual(WRITABLE_ATTRIBUTES, {"power", "child_lock", "storage"})
+
+    def test_all_usage_sensors_are_exposed(self) -> None:
+        descriptions = {description.key for description in sensor.SENSOR_DESCRIPTIONS}
+        self.assertTrue(USAGE_SENSOR_KEYS.issubset(descriptions))
 
     def test_discovery_passes_single_ip_string(self) -> None:
         with patch.object(config_flow, "discover", return_value={}) as discover_mock:
@@ -449,6 +461,217 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
         self.assertFalse(coordinator.data["local_connection"])
         self.assertEqual(listener.call_count, 2)
         await coordinator.async_close()
+
+    async def test_coalesced_cycle_edges_are_kept_for_usage_tracking(self) -> None:
+        entry = ConfigEntry(
+            created_at=datetime.now(UTC),
+            data=self._candidate(),
+            discovery_keys=MappingProxyType({}),
+            domain=DOMAIN,
+            minor_version=0,
+            modified_at=datetime.now(UTC),
+            options=None,
+            source="user",
+            state=ConfigEntryState.SETUP_IN_PROGRESS,
+            subentries_data=None,
+            title="Dishwasher",
+            unique_id="123456",
+            version=1,
+        )
+        device = Mock()
+        device.available = True
+        device.attributes = {
+            "status": "off",
+            "mode": "eco_wash",
+            "progress": "idle",
+        }
+        coordinator = ComfeeDishwasherCoordinator(self.hass, entry, device)
+        coordinator.data = dict(coordinator._cached_data)
+        await coordinator.async_start()
+        callback = device.register_update.call_args.args[0]
+
+        def emit_cycle() -> None:
+            callback({"status": "running", "mode": "eco_wash", "progress": "wash"})
+            callback({"status": "running", "progress": "complete"})
+
+        await self.hass.async_add_executor_job(emit_cycle)
+        await self.hass.async_block_till_done()
+
+        self.assertEqual(coordinator.data[ESTIMATED_ENERGY_TODAY], 0.99)
+        self.assertEqual(coordinator.data[ESTIMATED_WATER_TODAY], 10.4)
+        await coordinator.async_close()
+
+    async def test_completed_cycle_updates_usage_once(self) -> None:
+        entry = ConfigEntry(
+            created_at=datetime.now(UTC),
+            data=self._candidate(),
+            discovery_keys=MappingProxyType({}),
+            domain=DOMAIN,
+            minor_version=0,
+            modified_at=datetime.now(UTC),
+            options=None,
+            source="user",
+            state=ConfigEntryState.SETUP_IN_PROGRESS,
+            subentries_data=None,
+            title="Dishwasher",
+            unique_id="123456",
+            version=1,
+        )
+        device = Mock()
+        device.available = True
+        device.attributes = {
+            "power": True,
+            "status": "off",
+            "mode": "eco_wash",
+            "progress": "idle",
+        }
+        coordinator = ComfeeDishwasherCoordinator(self.hass, entry, device)
+        coordinator.data = dict(coordinator._cached_data)
+        await coordinator.async_start()
+        callback = device.register_update.call_args.args[0]
+
+        await self.hass.async_add_executor_job(
+            callback,
+            {"status": "running", "mode": "eco_wash", "progress": "wash"},
+        )
+        await self.hass.async_block_till_done()
+        await self.hass.async_add_executor_job(
+            callback,
+            {"status": "running", "progress": "complete"},
+        )
+        await self.hass.async_block_till_done()
+
+        self.assertEqual(coordinator.data[ESTIMATED_ENERGY_LAST_CYCLE], 0.99)
+        self.assertEqual(coordinator.data[ESTIMATED_WATER_LAST_CYCLE], 10.4)
+        self.assertEqual(coordinator.data[ESTIMATED_ENERGY_TODAY], 0.99)
+        self.assertEqual(coordinator.data[ESTIMATED_WATER_TODAY], 10.4)
+        self.assertEqual(coordinator.data[ESTIMATED_ENERGY_THIS_MONTH], 0.99)
+        self.assertEqual(coordinator.data[ESTIMATED_WATER_THIS_MONTH], 10.4)
+
+        await self.hass.async_add_executor_job(
+            callback,
+            {"status": "running", "progress": "complete"},
+        )
+        await self.hass.async_block_till_done()
+        await self.hass.async_add_executor_job(
+            callback,
+            {"status": "off", "progress": "complete"},
+        )
+        await self.hass.async_block_till_done()
+        self.assertEqual(coordinator.data[ESTIMATED_ENERGY_TODAY], 0.99)
+        self.assertEqual(coordinator.data[ESTIMATED_WATER_TODAY], 10.4)
+        await coordinator.async_close()
+
+    async def test_cancel_error_and_unknown_program_are_not_counted(self) -> None:
+        tracker = DishwasherUsageTracker(self.hass, "cancel-error-test")
+        now = datetime(2026, 9, 4, 12, tzinfo=UTC)
+        await tracker.async_initialize(
+            {"status": "off", "mode": "eco_wash", "progress": "idle"},
+            now,
+        )
+
+        tracker.process_state(
+            {"status": "running", "mode": "eco_wash", "progress": "wash"},
+            now,
+        )
+        tracker.process_state(
+            {"status": "cancel", "mode": "eco_wash", "progress": "idle"},
+            now,
+        )
+        tracker.process_state(
+            {"status": "running", "mode": "strong_wash", "progress": "wash"},
+            now,
+        )
+        tracker.process_state(
+            {"status": "error", "mode": "strong_wash", "progress": "complete"},
+            now,
+        )
+        self.assertEqual(tracker.sensor_values[ESTIMATED_ENERGY_TODAY], 0.0)
+        self.assertEqual(tracker.sensor_values[ESTIMATED_WATER_TODAY], 0.0)
+
+        tracker.process_state(
+            {"status": "running", "mode": "auto_wash", "progress": "wash"},
+            now,
+        )
+        tracker.process_state(
+            {"status": "off", "mode": "auto_wash", "progress": "complete"},
+            now,
+        )
+        self.assertIsNone(tracker.sensor_values[ESTIMATED_ENERGY_LAST_CYCLE])
+        self.assertIsNone(tracker.sensor_values[ESTIMATED_WATER_LAST_CYCLE])
+        self.assertEqual(tracker.sensor_values[ESTIMATED_ENERGY_TODAY], 0.0)
+        attributes = tracker.attributes_for(ESTIMATED_ENERGY_LAST_CYCLE)
+        self.assertEqual(attributes["program"], "auto_wash")
+        self.assertFalse(attributes["counted_in_totals"])
+        await tracker.async_shutdown()
+
+    async def test_usage_survives_restart_without_duplicate_counting(self) -> None:
+        now = datetime(2026, 9, 4, 12, tzinfo=UTC)
+        first = DishwasherUsageTracker(self.hass, "restart-test")
+        await first.async_initialize(
+            {"status": "off", "mode": "eco_wash", "progress": "idle"},
+            now,
+        )
+        first.process_state(
+            {"status": "running", "mode": "eco_wash", "progress": "wash"},
+            now,
+        )
+        await first.async_shutdown()
+
+        second = DishwasherUsageTracker(self.hass, "restart-test")
+        await second.async_initialize(
+            {"status": "off", "mode": "eco_wash", "progress": "complete"},
+            now,
+        )
+        self.assertEqual(second.sensor_values[ESTIMATED_ENERGY_TODAY], 0.99)
+        self.assertEqual(second.sensor_values[ESTIMATED_WATER_TODAY], 10.4)
+        await second.async_shutdown()
+
+        third = DishwasherUsageTracker(self.hass, "restart-test")
+        await third.async_initialize(
+            {"status": "off", "mode": "eco_wash", "progress": "complete"},
+            now,
+        )
+        self.assertEqual(third.sensor_values[ESTIMATED_ENERGY_TODAY], 0.99)
+        self.assertEqual(third.sensor_values[ESTIMATED_WATER_TODAY], 10.4)
+        await third.async_shutdown()
+
+    async def test_usage_rolls_over_by_local_day_and_month(self) -> None:
+        tracker = DishwasherUsageTracker(self.hass, "rollover-test")
+        january_first = datetime(2026, 1, 1, 12, tzinfo=UTC)
+        await tracker.async_initialize(
+            {"status": "off", "mode": "eco_wash", "progress": "idle"},
+            january_first,
+        )
+        tracker.process_state(
+            {"status": "running", "mode": "eco_wash", "progress": "wash"},
+            january_first,
+        )
+        tracker.process_state(
+            {"status": "off", "mode": "eco_wash", "progress": "complete"},
+            january_first,
+        )
+
+        january_second = datetime(2026, 1, 2, tzinfo=UTC)
+        self.assertTrue(tracker.rollover(january_second))
+        self.assertEqual(tracker.sensor_values[ESTIMATED_ENERGY_TODAY], 0.0)
+        self.assertEqual(tracker.sensor_values[ESTIMATED_WATER_TODAY], 0.0)
+        self.assertEqual(tracker.sensor_values[ESTIMATED_ENERGY_THIS_MONTH], 0.99)
+        self.assertEqual(tracker.sensor_values[ESTIMATED_WATER_THIS_MONTH], 10.4)
+        self.assertEqual(
+            tracker.period_start(ESTIMATED_ENERGY_TODAY),
+            january_second,
+        )
+
+        february_first = datetime(2026, 2, 1, tzinfo=UTC)
+        self.assertTrue(tracker.rollover(february_first))
+        self.assertEqual(tracker.sensor_values[ESTIMATED_ENERGY_THIS_MONTH], 0.0)
+        self.assertEqual(tracker.sensor_values[ESTIMATED_WATER_THIS_MONTH], 0.0)
+        self.assertEqual(
+            tracker.period_start(ESTIMATED_ENERGY_THIS_MONTH),
+            february_first,
+        )
+        await tracker.async_shutdown()
 
     async def test_callback_after_close_is_ignored(self) -> None:
         entry = ConfigEntry(

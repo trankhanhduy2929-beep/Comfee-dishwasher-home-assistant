@@ -19,6 +19,22 @@ thiết bị `0xE1` bằng giao thức local của `midea-local`.
   bảo quản/sấy khí.
 - Chọn chương trình và nút khởi động bị tắt mặc định vì một số firmware E1 có
   thể bắt đầu chu trình ngay khi nhận lệnh chọn chương trình.
+- Thêm sáu sensor tiêu thụ **ước tính**: điện/nước lần rửa gần nhất, tổng hôm
+  nay và tổng tháng này. Tracker dùng bộ nhớ cục bộ của Home Assistant, không
+  gọi cloud.
+
+Các khóa sensor tương ứng là `estimated_energy_last_cycle`,
+`estimated_water_last_cycle`, `estimated_energy_today`,
+`estimated_water_today`, `estimated_energy_this_month` và
+`estimated_water_this_month`.
+
+Lưu ý: firmware E1 `760EY095` không cung cấp số kWh hoặc lít thực tế qua LAN.
+Các sensor tiêu thụ cộng định mức tham khảo của profile E1 `7600024L` khi máy
+chuyển sang `complete`; đây chưa phải thông số đã xác nhận riêng cho `760EY095`.
+Chu kỳ bị hủy hoặc lỗi không được cộng. Đây là ước tính theo chương trình,
+không phải số đo công tơ. Nếu chương trình chưa có định mức, sensor lần rửa
+gần nhất sẽ là `Unknown` và tổng không thay đổi. Chu kỳ diễn ra hoàn toàn khi
+Home Assistant tắt sẽ không thể được ghi nhận.
 
 Hướng dẫn cài đặt và sử dụng nằm trong README ở thư mục gốc repository.
 

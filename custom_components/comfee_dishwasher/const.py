@@ -1,6 +1,7 @@
 """Constants for the Comfee dishwasher integration."""
 
 from enum import IntEnum
+from typing import Final, NamedTuple
 
 DOMAIN = "comfee_dishwasher"
 CONF_ACCOUNT = "account"
@@ -15,6 +16,42 @@ DEVICE_TYPE_DISHWASHER = 0xE1
 DEFAULT_PORT = 6444
 DEFAULT_PROTOCOL = 3
 WRITABLE_ATTRIBUTES = frozenset({"power", "child_lock", "storage"})
+
+ESTIMATED_ENERGY_LAST_CYCLE = "estimated_energy_last_cycle"
+ESTIMATED_WATER_LAST_CYCLE = "estimated_water_last_cycle"
+ESTIMATED_ENERGY_TODAY = "estimated_energy_today"
+ESTIMATED_WATER_TODAY = "estimated_water_today"
+ESTIMATED_ENERGY_THIS_MONTH = "estimated_energy_this_month"
+ESTIMATED_WATER_THIS_MONTH = "estimated_water_this_month"
+
+LAST_CYCLE_USAGE_KEYS = frozenset(
+    {ESTIMATED_ENERGY_LAST_CYCLE, ESTIMATED_WATER_LAST_CYCLE}
+)
+DAILY_USAGE_KEYS = frozenset({ESTIMATED_ENERGY_TODAY, ESTIMATED_WATER_TODAY})
+MONTHLY_USAGE_KEYS = frozenset(
+    {ESTIMATED_ENERGY_THIS_MONTH, ESTIMATED_WATER_THIS_MONTH}
+)
+USAGE_SENSOR_KEYS = LAST_CYCLE_USAGE_KEYS | DAILY_USAGE_KEYS | MONTHLY_USAGE_KEYS
+USAGE_REFERENCE_MODEL = "7600024L"
+USAGE_ESTIMATE_SOURCE = "fixed_program_reference"
+
+
+class ProgramUsageEstimate(NamedTuple):
+    """Reference usage estimate for one completed dishwasher program."""
+
+    energy_kwh: float
+    water_liters: float
+
+
+PROGRAM_USAGE_ESTIMATES: Final[dict[str, ProgramUsageEstimate]] = {
+    "germ": ProgramUsageEstimate(energy_kwh=0.765, water_liters=9.9),
+    "eco_wash": ProgramUsageEstimate(energy_kwh=0.99, water_liters=10.4),
+    "strong_wash": ProgramUsageEstimate(energy_kwh=1.28, water_liters=13.9),
+    "hour_wash": ProgramUsageEstimate(energy_kwh=0.91, water_liters=10.4),
+    "soak_wash": ProgramUsageEstimate(energy_kwh=0.02, water_liters=3.4),
+    "self_clean": ProgramUsageEstimate(energy_kwh=1.524, water_liters=10.3),
+    "fruit_wash": ProgramUsageEstimate(energy_kwh=1.625, water_liters=13.3),
+}
 
 
 class DishwasherMode(IntEnum):

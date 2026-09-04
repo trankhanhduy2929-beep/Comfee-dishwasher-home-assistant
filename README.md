@@ -78,9 +78,25 @@ MSmartHome được ủy quyền hoặc từ cấu hình local đang hoạt đ�
 - Switch nguồn, khóa trẻ em và bảo quản/sấy khí; đây là ba lệnh ghi LAN đã được thư viện xác nhận.
 - Nút cập nhật trạng thái, kết nối lại LAN và nút khởi động chương trình hiện tại.
 - Select chương trình vẫn tắt mặc định vì một số firmware E1 chạy ngay khi chọn.
+- Điện và nước **ước tính** cho lần rửa hoàn tất gần nhất, tổng trong ngày và
+  tổng trong tháng; dữ liệu được lưu cục bộ để không mất sau khi Home Assistant
+  khởi động lại.
 
-Các entity mới chỉ đọc được tạo theo dữ liệu mà máy thực tế trả về. Vì vậy model
-E1 khác có thể có ít hoặc nhiều trạng thái hơn. Nút **Cập nhật trạng thái** và
+> [!NOTE]
+> Firmware E1 của Comfee `760EY095` không trả về công tơ kWh/lít qua giao thức
+> local. Các sensor tiêu thụ dùng định mức tham khảo theo chương trình của
+> profile E1 `7600024L` (không phải thông số đã xác nhận riêng cho `760EY095`,
+> và không phải số đo thực tế): `eco_wash` 0,99 kWh / 10,4 L, `strong_wash` 1,28 kWh /
+> 13,9 L, `hour_wash` 0,91 kWh / 10,4 L, `soak_wash` 0,02 kWh / 3,4 L,
+> `self_clean` 1,524 kWh / 10,3 L, `germ` 0,765 kWh / 9,9 L và `fruit_wash`
+> 1,625 kWh / 13,3 L. Chương trình chưa có định mức sẽ hiện `Unknown` và không
+> làm tăng tổng. Chu kỳ được tính theo thời điểm máy báo hoàn tất; nếu
+> Home Assistant tắt suốt cả chu kỳ thì chu kỳ đó không thể được ghi nhận.
+
+Các entity trạng thái E1 chỉ đọc được tạo theo dữ liệu mà máy thực tế trả về.
+Vì vậy model E1 khác có thể có ít hoặc nhiều trạng thái hơn; sáu sensor tiêu
+thụ ở trên là giá trị tính cục bộ từ trạng thái chu kỳ. Nút **Cập nhật trạng thái**
+và
 **Kết nối lại LAN** không gọi cloud và không gửi lệnh vận hành máy. Nút cập
 nhật chỉ gửi một truy vấn đọc; thread nền vẫn là nơi duy nhất đọc socket.
 
