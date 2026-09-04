@@ -18,7 +18,7 @@ def main() -> None:
         for path in sorted(COMPONENT.rglob("*")):
             if not path.is_file() or "__pycache__" in path.parts:
                 continue
-            archive_name = Path("comfee_dishwasher") / path.relative_to(COMPONENT)
+            archive_name = path.relative_to(COMPONENT)
             info = ZipInfo(archive_name.as_posix(), ARCHIVE_TIMESTAMP)
             info.compress_type = ZIP_DEFLATED
             info.external_attr = 0o100644 << 16

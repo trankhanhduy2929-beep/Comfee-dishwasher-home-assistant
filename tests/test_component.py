@@ -69,7 +69,7 @@ class ComponentContractTests(TestCase):
     def test_manifest_contract(self) -> None:
         manifest = json.loads((COMPONENT / "manifest.json").read_text())
         self.assertEqual(manifest["domain"], "comfee_dishwasher")
-        self.assertEqual(manifest["version"], "0.5.0")
+        self.assertEqual(manifest["version"], "0.5.1")
         self.assertEqual(manifest["requirements"], ["midea-local==10.0.1"])
         self.assertEqual(manifest["iot_class"], "local_polling")
         self.assertTrue(manifest["config_flow"])
@@ -191,14 +191,24 @@ class ComponentContractTests(TestCase):
         build_component.main()
         with ZipFile(build_component.OUTPUT) as archive:
             names = archive.namelist()
-        self.assertIn("comfee_dishwasher/manifest.json", names)
-        self.assertIn("comfee_dishwasher/brand/icon.png", names)
-        self.assertIn("comfee_dishwasher/brand/logo.png", names)
-        self.assertIn("comfee_dishwasher/icons.json", names)
-        self.assertIn("comfee_dishwasher/diagnostics.py", names)
+            with tempfile.TemporaryDirectory(prefix="comfee-hacs-test-") as config_dir:
+                install_dir = (
+                    Path(config_dir) / "custom_components" / "comfee_dishwasher"
+                )
+                archive.extractall(install_dir)
+                self.assertTrue((install_dir / "manifest.json").is_file())
+                self.assertFalse(
+                    (install_dir / "comfee_dishwasher" / "manifest.json").exists(),
+                )
+        self.assertIn("manifest.json", names)
+        self.assertIn("brand/icon.png", names)
+        self.assertIn("brand/logo.png", names)
+        self.assertIn("icons.json", names)
+        self.assertIn("diagnostics.py", names)
         self.assertFalse(any("__pycache__" in name for name in names))
         self.assertFalse(any("credentials" in name.casefold() for name in names))
-        self.assertTrue(all(name.startswith("comfee_dishwasher/") for name in names))
+        self.assertFalse(any(name.startswith("comfee_dishwasher/") for name in names))
+        self.assertFalse(any(name.startswith("custom_components/") for name in names))
         checksum = build_component.CHECKSUM.read_text(encoding="ascii")
         self.assertIn(build_component.OUTPUT.name, checksum)
         self.assertEqual(

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1 — 2026-09-04
+
+- Fix the HACS release ZIP layout so files are extracted directly into
+  `/config/custom_components/comfee_dishwasher` instead of creating a second
+  nested `comfee_dishwasher` directory.
+- Add an archive installation test that reproduces the HACS extraction target
+  and rejects nested component layouts.
+- Correct the manual installation instructions for the flat HACS archive.
+
 ## 0.5.0 — 2026-09-04
 
 - Add estimated energy and water sensors for the last completed cycle, today

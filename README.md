@@ -129,13 +129,18 @@ trả về diagnostics.
 
 ## Cài thủ công
 
-Tải asset `comfee_dishwasher.zip` từ trang **Releases**, giải nén vào
-`/config/custom_components/`, rồi restart Home Assistant. Cấu trúc sau khi giải
-nén phải là:
+Tải asset `comfee_dishwasher.zip` từ trang **Releases**, tạo thư mục
+`/config/custom_components/comfee_dishwasher/`, rồi giải nén trực tiếp các file
+trong ZIP vào thư mục đó. Sau đó restart Home Assistant. Cấu trúc đúng là:
 
 ```text
 /config/custom_components/comfee_dishwasher/manifest.json
 ```
+
+Không để thành
+`/config/custom_components/comfee_dishwasher/comfee_dishwasher/manifest.json`.
+Nếu đã cập nhật bản `0.5.0` và gặp cấu trúc lồng này, hãy cập nhật lên bản mới,
+xóa riêng thư mục `comfee_dishwasher` nằm bên trong rồi restart Home Assistant.
 
 ## Build và kiểm tra
 
