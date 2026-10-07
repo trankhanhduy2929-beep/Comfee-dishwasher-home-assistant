@@ -47,11 +47,16 @@
     },
     "error": {
       "cloud_login_failed": "Không đăng nhập được tài khoản trên ứng dụng/cloud đã chọn.",
+      "cloud_session_expired": "Phiên đăng nhập cloud đã hết hạn. Hãy đăng nhập lại ứng dụng thiết bị rồi thử lại.",
+      "cloud_account_locked": "Tài khoản ứng dụng bị khóa tạm thời do đăng nhập sai nhiều lần. Đợi vài phút rồi thử lại.",
+      "cloud_too_many_sessions": "Tài khoản ứng dụng đang đăng nhập trên quá nhiều thiết bị. Hãy đăng xuất bớt rồi thử lại.",
+      "cloud_unsupported": "Ứng dụng/cloud đã chọn không khớp với thiết bị này. Hãy chọn đúng app đã dùng để đăng ký máy.",
+      "cloud_request_failed": "Cloud từ chối yêu cầu. Hãy kiểm tra Internet rồi thử lại, hoặc nhập thông tin LAN thủ công.",
       "device_not_found": "Không tìm thấy thiết bị LAN nào có driver được integration hỗ trợ.",
       "device_not_in_account": "Không có thiết bị LAN tìm thấy nào thuộc tài khoản ứng dụng đã chọn.",
       "device_auth_failed": "Đã tìm thấy thiết bị nhưng không có key nào xác thực được.",
       "invalid_token": "Token và key phải là chuỗi hexadecimal không rỗng.",
-      "unsupported_device_type": "Mã loại này chưa có driver trong phiên bản midea-local đang dùng.",
+      "unsupported_device_type": "Mã loại này chưa có driver trong phiên bản midea-local đang cài.",
       "manual_auth_failed": "Thông tin LAN không xác thực được thiết bị.",
       "setup_failed": "Cài đặt thất bại. Hãy kiểm tra tài khoản, mạng, mã loại và trạng thái thiết bị."
     },

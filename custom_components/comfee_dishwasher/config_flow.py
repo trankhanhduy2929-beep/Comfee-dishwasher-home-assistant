@@ -21,6 +21,7 @@ from midealocal.cloud import SUPPORTED_CLOUDS, get_midea_cloud
 from midealocal.const import ProtocolVersion
 from midealocal.devices import device_selector
 from midealocal.discover import discover
+from midealocal.exceptions import MideaCloudError
 
 from .const import (
     CONF_ACCOUNT,
@@ -52,6 +53,8 @@ CLOUD_LABELS = {
     "NetHome Plus": "NetHome Plus",
     "Midea Air": "Midea Air / Arctic King",
     "Ariston Clima": "Ariston Clima",
+    "OS Comfort": "OS Comfort",
+    "Toshiba Iolife": "Toshiba Iolife",
     "美的美居": "Midea Meiju (China)",
 }
 CLOUD_OPTIONS = {
@@ -59,6 +62,19 @@ CLOUD_OPTIONS = {
     for cloud_name in SUPPORTED_CLOUDS
 }
 MEIJU_CLOUD_NAME = "美的美居"
+
+# The library maps every cloud error code to a stable slug. These slugs become
+# config-flow error keys so the user sees why the appliance app rejected the
+# request instead of a generic setup failure.
+CLOUD_ERROR_KEYS = {
+    "account_locked": "cloud_account_locked",
+    "cloud_session_expired": "cloud_session_expired",
+    "device_not_registered": "device_not_in_account",
+    "invalid_auth": "cloud_login_failed",
+    "invalid_cloud_server": "cloud_unsupported",
+    "too_many_logged_in_devices": "cloud_too_many_sessions",
+}
+CLOUD_ERROR_FALLBACK = "cloud_request_failed"
 
 
 class ComfeeDishwasherConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -101,6 +117,16 @@ class ComfeeDishwasherConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
             except CloudLoginError:
                 return self._show_cloud_form(user_input, "cloud_login_failed")
+            except MideaCloudError as error:
+                _LOGGER.debug(
+                    "Cloud request failed with code %s (%s)",
+                    error.code,
+                    error.translation_key,
+                )
+                return self._show_cloud_form(
+                    user_input,
+                    CLOUD_ERROR_KEYS.get(error.translation_key, CLOUD_ERROR_FALLBACK),
+                )
             except DeviceNotFoundError:
                 return self._show_cloud_form(user_input, "device_not_found")
             except DeviceNotInAccountError:

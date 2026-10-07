@@ -1,14 +1,16 @@
 # Comfee / Midea Local Appliances
 
 Custom integration cho Home Assistant, kết nối thiết bị thuộc hệ sinh thái
-Midea bằng giao thức LAN của `midea-local 10.1.0`.
+Midea bằng giao thức LAN của `midea-local >= 11.0.1`.
 
 - Giữ domain `comfee_dishwasher` để tương thích cấu hình Comfee E1 cũ.
 - Hỗ trợ discovery cho 36 loại driver: điều hòa, quạt, lọc khí, hút ẩm, tạo
   ẩm, giặt/sấy, tủ lạnh, bình nóng lạnh, thiết bị bếp, robot hút bụi, máy lọc
   nước và hai loại máy rửa bát `0xE1`/`0x34`.
 - Hỗ trợ lấy token/key qua MSmartHome/SmartHome, NetHome Plus, Midea Air/Arctic
-  King, Ariston Clima và Midea Meiju.
+  King, Ariston Clima, OS Comfort, Toshiba Iolife và Midea Meiju.
+- Home Assistant đã có integration `midea` chính thức: chỉ chọn một trong hai
+  cho cùng một thiết bị.
 - Cloud chỉ dùng trong config flow; tài khoản và mật khẩu không được lưu.
 - Sau khi cấu hình, trạng thái và lệnh đã cho phép đi trực tiếp qua LAN.
 - Một thread nền trên mỗi thiết bị nhận thông báo và truy vấn dự phòng. Callback

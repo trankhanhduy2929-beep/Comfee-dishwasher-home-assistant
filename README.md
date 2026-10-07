@@ -8,10 +8,10 @@
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=trankhanhduy2929-beep&repository=Comfee-dishwasher-home-assistant&category=integration)
 
 Custom integration không chính thức để kết nối thiết bị thuộc hệ sinh thái
-Midea với Home Assistant qua mạng nội bộ. Bản `0.6.0` giữ nguyên domain
+Midea với Home Assistant qua mạng nội bộ. Bản `0.7.0` giữ nguyên domain
 `comfee_dishwasher` để không làm mất cấu hình máy rửa bát Comfee hiện có, đồng
 thời mở rộng discovery và đọc trạng thái cho toàn bộ 36 driver có sẵn trong
-`midea-local 10.1.0`.
+`midea-local >= 11.0.1`.
 
 Tài khoản cloud chỉ được dùng trong bước cấu hình để lấy token/key LAN. Sau khi
 thêm thiết bị, Home Assistant đọc trạng thái và gửi các lệnh đã cho phép trực
@@ -19,8 +19,10 @@ tiếp đến thiết bị qua LAN.
 
 > [!IMPORTANT]
 > Đây là dự án cộng đồng, không liên kết hoặc được Comfee, Midea hay các hãng
-> tương thích chứng thực. Không cấu hình cùng một thiết bị đồng thời trong
-> integration này và một integration Midea khác.
+> tương thích chứng thực. Home Assistant hiện có integration `midea` chính
+> thức dùng cùng thư viện `midea-local`. Không cấu hình cùng một thiết bị đồng
+> thời trong integration này và integration `midea` chính thức (hay bất kỳ
+> integration Midea nào khác), nếu không thiết bị sẽ cạnh tranh kết nối LAN.
 
 ## Cài đặt qua HACS
 
@@ -51,6 +53,8 @@ Chọn đúng ứng dụng/cloud đã dùng để đăng ký thiết bị:
 - **NetHome Plus**
 - **Midea Air / Arctic King**
 - **Ariston Clima**
+- **OS Comfort**
+- **Toshiba Iolife**
 - **Midea Meiju / 美的美居** cho tài khoản Trung Quốc
 
 Nhập tài khoản và mật khẩu của ứng dụng đó. Mật khẩu, tài khoản và tên cloud
@@ -59,6 +63,19 @@ token/key LAN và metadata không nhạy cảm cần cho kết nối cục bộ 
 
 Nếu có nhiều thiết bị tương thích trong tài khoản, config flow sẽ cho chọn một
 thiết bị. Chạy lại quy trình để thêm thiết bị tiếp theo.
+
+Khi ứng dụng/cloud từ chối, màn hình thêm thiết bị báo đúng nguyên nhân bằng
+tiếng Việt thay vì báo lỗi chung:
+
+| Thông báo | Nguyên nhân và cách xử lý |
+| --- | --- |
+| Không đăng nhập được tài khoản | Sai email/mật khẩu hoặc sai app đã dùng để đăng ký máy |
+| Phiên đăng nhập cloud đã hết hạn | Đăng nhập lại app thiết bị rồi thử lại |
+| Tài khoản bị khóa tạm thời | Đăng nhập sai nhiều lần, đợi vài phút rồi thử lại |
+| Quá nhiều thiết bị đang đăng nhập | Đăng xuất bớt một số thiết bị |
+| Ứng dụng/cloud không khớp | Chọn đúng app đã dùng để đăng ký máy rửa bát |
+| Cloud từ chối yêu cầu | Mất Internet hoặc lỗi tạm thời, thử lại hoặc nhập LAN thủ công |
+| Không có thiết bị LAN nào thuộc tài khoản | Máy đang được đăng ký bởi tài khoản khác |
 
 ### Thông tin LAN thủ công
 
@@ -96,7 +113,7 @@ kết nối sai.
 
 ## Loại thiết bị
 
-Catalog `0.6.0` có 36 loại driver LAN:
+Catalog `0.7.0` có 36 loại driver LAN:
 
 | Nhóm | Mã loại và thiết bị |
 | --- | --- |

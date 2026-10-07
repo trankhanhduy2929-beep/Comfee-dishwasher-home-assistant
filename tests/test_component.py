@@ -30,6 +30,10 @@ from homeassistant.exceptions import HomeAssistantError
 from midealocal.const import ProtocolVersion
 from midealocal.devices import device_selector
 from midealocal.devices.e1 import MideaE1Device
+from midealocal.exceptions import CLOUD_ERRORS, cloud_api_error
+from midealocal.exceptions import CloudLoginError as LibraryCloudLoginError
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 import build_component
 from custom_components.comfee_dishwasher import (
@@ -74,6 +78,18 @@ from custom_components.comfee_dishwasher.usage import DishwasherUsageTracker
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "comfee_dishwasher"
 
+# midea-local pins currently used by Home Assistant core: master and dev.
+# The manifest must accept every one of them or hassfest rejects the
+# integration, and a downgrade would break core's own Midea integration.
+HOME_ASSISTANT_PINS = ("11.0.1", "12.2.0")
+
+
+def midealocal_version() -> str:
+    """Return the installed midea-local version."""
+    from midealocal.version import __version__
+
+    return __version__
+
 
 class ComponentContractTests(TestCase):
     """Verify metadata, safety properties and dependency compatibility."""
@@ -81,14 +97,35 @@ class ComponentContractTests(TestCase):
     def test_manifest_contract(self) -> None:
         manifest = json.loads((COMPONENT / "manifest.json").read_text())
         self.assertEqual(manifest["domain"], "comfee_dishwasher")
-        self.assertEqual(manifest["version"], "0.6.0")
-        self.assertEqual(manifest["requirements"], ["midea-local==10.1.0"])
+        self.assertEqual(manifest["version"], "0.7.0")
+        self.assertEqual(manifest["requirements"], ["midea-local>=11.0.1"])
         self.assertEqual(manifest["iot_class"], "local_polling")
         self.assertTrue(manifest["config_flow"])
 
         hacs = json.loads((ROOT / "hacs.json").read_text())
         self.assertTrue(hacs["zip_release"])
         self.assertEqual(hacs["filename"], "comfee_dishwasher.zip")
+
+    def test_midea_local_requirement_follows_home_assistant(self) -> None:
+        """Home Assistant ships midea-local, so the manifest may only bound it.
+
+        An exact pin makes hassfest fail as soon as core updates the library and
+        a higher pin than core uses would downgrade the copy core's own Midea
+        integration needs.
+        """
+        manifest = json.loads((COMPONENT / "manifest.json").read_text())
+        requirement = Requirement(manifest["requirements"][0])
+        self.assertEqual(canonicalize_name(requirement.name), "midea-local")
+        self.assertFalse(
+            [
+                specifier
+                for specifier in requirement.specifier
+                if specifier.operator in ("==", "===")
+            ],
+        )
+        for pin in HOME_ASSISTANT_PINS:
+            self.assertTrue(requirement.specifier.contains(pin), pin)
+        self.assertTrue(requirement.specifier.contains(midealocal_version()))
 
     def test_translation_contract(self) -> None:
         strings = json.loads((COMPONENT / "strings.json").read_text())
@@ -228,6 +265,35 @@ class ComponentContractTests(TestCase):
             set(config_flow.SUPPORTED_CLOUDS),
         )
         self.assertTrue(all(config_flow.CLOUD_OPTIONS.values()))
+
+    def test_cloud_error_strings_cover_every_library_slug(self) -> None:
+        """Each library cloud failure maps to an EN/VI message key."""
+        strings = json.loads((COMPONENT / "strings.json").read_text())
+        error_keys = set(strings["config"]["error"])
+        expected = set(config_flow.CLOUD_ERROR_KEYS.values()) | {
+            config_flow.CLOUD_ERROR_FALLBACK,
+        }
+        self.assertTrue(expected.issubset(error_keys))
+        self.assertEqual(
+            set(config_flow.CLOUD_ERROR_KEYS),
+            set(CLOUD_ERRORS.values()) - {"cloud_error"},
+        )
+        for slug in set(CLOUD_ERRORS.values()):
+            self.assertIn(
+                config_flow.CLOUD_ERROR_KEYS.get(
+                    slug,
+                    config_flow.CLOUD_ERROR_FALLBACK,
+                ),
+                error_keys,
+            )
+        for language in ("en", "vi"):
+            translated = json.loads(
+                (COMPONENT / "translations" / f"{language}.json").read_text(),
+            )
+            self.assertEqual(
+                set(translated["config"]["error"]),
+                error_keys,
+            )
 
     def test_writable_profiles_match_boolean_driver_attributes(self) -> None:
         for device_type, profile in DEVICE_PROFILES.items():
@@ -472,6 +538,55 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
         self.assertNotIn(CONF_PASSWORD, result["data"])
         self.assertNotIn(CONF_CLOUD_NAME, result["data"])
         self.assertEqual(result["data"][CONF_MODEL], "760EY095")
+
+    async def test_cloud_library_errors_map_to_specific_messages(self) -> None:
+        """A cloud failure shows the reason, not a generic setup error."""
+        cases = [
+            (7610, "cloud_account_locked"),
+            (3106, "cloud_session_expired"),
+            (65027, "cloud_too_many_sessions"),
+            (3201, "device_not_in_account"),
+            (3301, "cloud_unsupported"),
+            (3102, "cloud_login_failed"),
+            (9999, "cloud_request_failed"),
+        ]
+        for code, expected_key in cases:
+            flow = self._flow()
+            error = cloud_api_error(code, f"cloud failure {code}")
+            with patch.object(
+                flow,
+                "_async_cloud_candidates",
+                AsyncMock(side_effect=error),
+            ):
+                result = await flow.async_step_cloud(
+                    {
+                        CONF_ACCOUNT: "owner@example.invalid",
+                        CONF_PASSWORD: "test-password",
+                        CONF_CLOUD_NAME: "NetHome Plus",
+                        CONF_IP_ADDRESS: "",
+                    },
+                )
+            self.assertEqual(result["step_id"], "cloud", code)
+            self.assertEqual(result["errors"]["base"], expected_key, code)
+
+    async def test_cloud_login_error_still_reports_invalid_credentials(self) -> None:
+        """The library login error keeps the existing wrong-password message."""
+        flow = self._flow()
+        error = LibraryCloudLoginError(3101, "wrong password")
+        with patch.object(
+            flow,
+            "_async_cloud_candidates",
+            AsyncMock(side_effect=error),
+        ):
+            result = await flow.async_step_cloud(
+                {
+                    CONF_ACCOUNT: "owner@example.invalid",
+                    CONF_PASSWORD: "test-password",
+                    CONF_CLOUD_NAME: "NetHome Plus",
+                    CONF_IP_ADDRESS: "",
+                },
+            )
+        self.assertEqual(result["errors"]["base"], "cloud_login_failed")
 
     async def test_cloud_candidate_flow_with_mock_cloud(self) -> None:
         flow = self._flow()
@@ -917,6 +1032,12 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
         self.assertTrue(active["operation_warning"])
 
     async def test_device_callbacks_are_coalesced_on_hass_loop(self) -> None:
+        """Merge one burst, then deliver each later appliance change once.
+
+        The first burst is emitted without yielding to the loop, which is what
+        a fast device thread does in practice, so the coalescing guarantee is
+        checked deterministically instead of racing the loop.
+        """
         entry = ConfigEntry(
             created_at=datetime.now(UTC),
             data=self._candidate(),
@@ -952,7 +1073,7 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
             callback({"status": "running"})
             callback({"progress": "wash", "time_remaining": 42})
 
-        await self.hass.async_add_executor_job(emit_updates)
+        emit_updates()
         await self.hass.async_block_till_done()
 
         self.assertEqual(coordinator.data["status"], "running")
@@ -963,13 +1084,22 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
 
         await self.hass.async_add_executor_job(
             callback,
+            {"status": "running", "progress": "rinse", "time_remaining": 30},
+        )
+        await self.hass.async_block_till_done()
+
+        self.assertEqual(coordinator.data["progress"], "rinse")
+        self.assertEqual(listener.call_count, 2)
+
+        await self.hass.async_add_executor_job(
+            callback,
             {"status": "error", "available": False},
         )
         await self.hass.async_block_till_done()
 
         self.assertTrue(coordinator.data["error_active"])
         self.assertFalse(coordinator.data["local_connection"])
-        self.assertEqual(listener.call_count, 2)
+        self.assertEqual(listener.call_count, 3)
         await coordinator.async_close()
 
     async def test_coalesced_cycle_edges_are_kept_for_usage_tracking(self) -> None:

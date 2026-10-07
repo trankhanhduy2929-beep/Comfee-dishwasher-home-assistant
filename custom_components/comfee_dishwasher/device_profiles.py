@@ -32,8 +32,9 @@ class DeviceProfile:
         return self.name_vi
 
 
-# These are the device modules shipped by midea-local 10.1.0. Do not add a
-# type here until the pinned dependency has a matching MideaAppliance class.
+# These are the device modules shipped by midea-local >= 11.0.1, the version
+# Home Assistant pins for its own Midea integration. Do not add a type here
+# until the installed dependency has a matching MideaAppliance class.
 DEVICE_PROFILES: dict[int, DeviceProfile] = {
     0x13: DeviceProfile(
         0x13,

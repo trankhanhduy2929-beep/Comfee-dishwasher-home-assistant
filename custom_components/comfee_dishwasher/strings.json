@@ -47,11 +47,16 @@
     },
     "error": {
       "cloud_login_failed": "The selected appliance app account could not log in.",
+      "cloud_session_expired": "The cloud session expired. Sign in to the appliance app again, then retry.",
+      "cloud_account_locked": "The app account is temporarily locked after too many failed logins. Wait a few minutes and retry.",
+      "cloud_too_many_sessions": "The app account is signed in on too many devices. Sign out of some devices and retry.",
+      "cloud_unsupported": "The selected app does not match this appliance. Choose the app that was used to register it.",
+      "cloud_request_failed": "The cloud rejected the request. Check the Internet connection and retry, or use manual LAN setup.",
       "device_not_found": "No device with a driver supported by this integration was found on the local network.",
       "device_not_in_account": "None of the discovered local devices are present in the selected app account.",
       "device_auth_failed": "The device was found, but no local key could authenticate it.",
       "invalid_token": "Token and key must be non-empty hexadecimal values.",
-      "unsupported_device_type": "This device type has no driver in the pinned midea-local version.",
+      "unsupported_device_type": "This device type has no driver in the installed midea-local version.",
       "manual_auth_failed": "The local credentials did not authenticate the appliance.",
       "setup_failed": "Setup failed. Check the account, network, selected device type and appliance state."
     },

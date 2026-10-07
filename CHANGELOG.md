@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.7.0 — 2026-10-06
+
+- Fix the Hassfest failure reported for `5b64875`: require `midea-local>=11.0.1`
+  instead of pinning `midea-local==10.1.0`. Home Assistant now ships an
+  official `midea` integration that depends on the same library
+  (`11.0.1` on master, `12.2.0` on dev), so an exact pin was rejected as
+  incompatible and would have downgraded core's copy.
+- Re-verify all 36 appliance drivers, the E1 attribute table and the whole test
+  suite against both `midea-local` 11.0.1 and 12.2.0; the local control surface
+  is unchanged.
+- Add **OS Comfort** and **Toshiba Iolife** to the app/cloud selector, matching
+  the clouds supported by the current library.
+- Map every cloud API failure to its own Vietnamese/English message: expired
+  session, locked account, too many logged-in devices, device registered in
+  another account, wrong app selection and a generic retry fallback, instead of
+  one opaque "setup failed".
+- Document that Home Assistant now ships an official `midea` integration and
+  that an appliance must never be configured in both at the same time.
+- Add contract tests that keep the requirement free of an exact pin, accept
+  every version Home Assistant pins, and prove each library cloud error code
+  resolves to a translated setup message.
+
 ## 0.6.0 — 2026-09-04
 
 - Expand discovery and local state support from E1 dishwashers to all 36
