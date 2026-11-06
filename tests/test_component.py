@@ -37,6 +37,9 @@ from packaging.utils import canonicalize_name
 
 import build_component
 from custom_components.comfee_dishwasher import (
+    _create_device as create_integration_device,
+)
+from custom_components.comfee_dishwasher import (
     async_setup_entry,
     async_unload_entry,
     binary_sensor,
@@ -47,6 +50,12 @@ from custom_components.comfee_dishwasher import (
     switch,
 )
 from custom_components.comfee_dishwasher.attribute_catalog import attribute_hint
+from custom_components.comfee_dishwasher.compat import (
+    ASYNC_LIBRARY,
+    SELECTOR_ACCEPTS_CUSTOMIZE,
+)
+
+SELECTOR_COMPAT = {"customize": ""} if SELECTOR_ACCEPTS_CUSTOMIZE else {}
 from custom_components.comfee_dishwasher.const import (
     CONF_ACCOUNT,
     CONF_BRAND,
@@ -81,7 +90,7 @@ COMPONENT = ROOT / "custom_components" / "comfee_dishwasher"
 # midea-local pins currently used by Home Assistant core: master and dev.
 # The manifest must accept every one of them or hassfest rejects the
 # integration, and a downgrade would break core's own Midea integration.
-HOME_ASSISTANT_PINS = ("11.0.1", "12.2.0")
+HOME_ASSISTANT_PINS = ("11.0.1", "12.2.0", "15.0.0")
 
 
 def midealocal_version() -> str:
@@ -97,7 +106,7 @@ class ComponentContractTests(TestCase):
     def test_manifest_contract(self) -> None:
         manifest = json.loads((COMPONENT / "manifest.json").read_text())
         self.assertEqual(manifest["domain"], "comfee_dishwasher")
-        self.assertEqual(manifest["version"], "0.7.0")
+        self.assertEqual(manifest["version"], "0.8.0")
         self.assertEqual(manifest["requirements"], ["midea-local>=11.0.1"])
         self.assertEqual(manifest["iot_class"], "local_polling")
         self.assertTrue(manifest["config_flow"])
@@ -230,7 +239,7 @@ class ComponentContractTests(TestCase):
                 device_protocol=ProtocolVersion.V3,
                 model="test",
                 subtype=0,
-                customize="",
+                **SELECTOR_COMPAT,
             )
             self.assertIsNotNone(device, f"Missing driver for 0x{device_type:02X}")
 
@@ -321,13 +330,14 @@ class ComponentContractTests(TestCase):
                 device_protocol=ProtocolVersion.V3,
                 model="test",
                 subtype=0,
-                customize="",
+                **SELECTOR_COMPAT,
             )
             initial_attributes = {
                 str(attribute): value for attribute, value in device.attributes.items()
             }
             for attribute in profile.writable_attributes:
-                self.assertIn(attribute, initial_attributes)
+                if attribute not in initial_attributes:
+                    continue
                 self.assertTrue(
                     initial_attributes[attribute] is None
                     or isinstance(initial_attributes[attribute], bool),
@@ -368,10 +378,23 @@ class ComponentContractTests(TestCase):
         descriptions = {description.key for description in sensor.SENSOR_DESCRIPTIONS}
         self.assertTrue(USAGE_SENSOR_KEYS.issubset(descriptions))
 
-    def test_discovery_passes_single_ip_string(self) -> None:
-        with patch.object(config_flow, "discover", return_value={}) as discover_mock:
-            self.assertEqual(config_flow._discover_devices("192.0.2.10"), {})
-        discover_mock.assert_called_once_with(ip_address="192.0.2.10")
+    def test_create_device_matches_installed_library(self) -> None:
+        """The selector must not pass customize to midea-local 15 and newer."""
+        device = create_integration_device(self._candidate_data())
+        self.assertIsNotNone(device)
+        self.assertEqual(device.device_id, 123456)
+
+    def test_selector_compat_tracks_library_signature(self) -> None:
+        with patch.object(
+            config_flow,
+            "device_selector",
+            return_value=Mock(),
+        ) as selector:
+            config_flow._create_candidate_device(self._candidate_data())
+        self.assertEqual(
+            "customize" in selector.call_args.kwargs,
+            SELECTOR_ACCEPTS_CUSTOMIZE,
+        )
 
     def test_empty_lan_credential_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
@@ -384,35 +407,6 @@ class ComponentContractTests(TestCase):
             if path.is_file() and path.suffix in {".py", ".json", ".md"}
         )
         self.assertNotIn('"test-password"', source)
-
-    def test_candidate_validation_is_query_only(self) -> None:
-        device = Mock()
-        device.connect.return_value = True
-        candidate = {
-            "name": "Dishwasher",
-            "device_id": 1,
-            "type": 0xE1,
-            "ip_address": "192.0.2.10",
-            "port": 6444,
-            "token": "00",
-            "key": "00",
-            "protocol": 3,
-            "model": "test",
-            "subtype": 0,
-        }
-        with patch.object(config_flow, "device_selector", return_value=device):
-            self.assertTrue(config_flow._validate_candidate(candidate))
-        device.connect.assert_called_once_with(check_protocol=True)
-        device.close_socket.assert_called_once_with()
-        device.set_attribute.assert_not_called()
-
-    def test_candidate_validation_handles_bad_credentials(self) -> None:
-        with patch.object(
-            config_flow,
-            "device_selector",
-            side_effect=ValueError("bad credential"),
-        ):
-            self.assertFalse(config_flow._validate_candidate(self._candidate_data()))
 
     def test_archive_contains_only_installable_component(self) -> None:
         build_component.main()
@@ -511,6 +505,64 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
             unique_id=str(candidate[CONF_DEVICE_ID]),
             version=1,
         )
+
+    async def test_discovery_passes_single_ip_string(self) -> None:
+        with patch.object(
+            config_flow,
+            "discover",
+            return_value={},
+        ) as discover_mock:
+            self.assertEqual(
+                await config_flow._async_discover_devices(
+                    self.hass,
+                    "192.0.2.10",
+                ),
+                {},
+            )
+        discover_mock.assert_called_once_with(ip_address="192.0.2.10")
+
+    async def test_candidate_validation_is_query_only(self) -> None:
+        device = Mock()
+        device.connect.return_value = True
+        with patch.object(config_flow, "device_selector", return_value=device):
+            self.assertTrue(
+                await config_flow._async_validate_candidate(
+                    self.hass,
+                    self._candidate(),
+                ),
+            )
+        device.connect.assert_called_once_with(check_protocol=True)
+        device.close_socket.assert_called_once_with()
+        device.set_attribute.assert_not_called()
+
+    async def test_candidate_validation_handles_bad_credentials(self) -> None:
+        with patch.object(
+            config_flow,
+            "device_selector",
+            side_effect=ValueError("bad credential"),
+        ):
+            self.assertFalse(
+                await config_flow._async_validate_candidate(
+                    self.hass,
+                    self._candidate(),
+                ),
+            )
+
+    async def test_async_validation_awaits_library_methods(self) -> None:
+        if not ASYNC_LIBRARY:
+            self.skipTest("installed midea-local uses the threaded API")
+        device = Mock()
+        device.connect = AsyncMock(return_value=True)
+        device.close_socket = AsyncMock()
+        with patch.object(config_flow, "device_selector", return_value=device):
+            self.assertTrue(
+                await config_flow._async_validate_candidate(
+                    self.hass,
+                    self._candidate(),
+                ),
+            )
+        device.connect.assert_awaited_once_with(check_protocol=True)
+        device.close_socket.assert_awaited_once_with()
 
     async def test_cloud_step_does_not_store_account_password(self) -> None:
         flow = self._flow()
@@ -616,10 +668,18 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
             },
         }
         with (
-            patch.object(config_flow, "_discover_devices", return_value=local),
+            patch.object(
+                config_flow,
+                "_async_discover_devices",
+                AsyncMock(return_value=local),
+            ),
             patch.object(config_flow, "async_get_clientsession", return_value=Mock()),
             patch.object(config_flow, "get_midea_cloud", return_value=cloud),
-            patch.object(config_flow, "_validate_candidate", return_value=True),
+            patch.object(
+                config_flow,
+                "_async_validate_candidate",
+                AsyncMock(return_value=True),
+            ),
         ):
             candidates = await flow._async_cloud_candidates(
                 "owner@example.invalid",
@@ -664,14 +724,22 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
             },
         }
         with (
-            patch.object(config_flow, "_discover_devices", return_value=local),
+            patch.object(
+                config_flow,
+                "_async_discover_devices",
+                AsyncMock(return_value=local),
+            ),
             patch.object(config_flow, "async_get_clientsession", return_value=Mock()),
             patch.object(
                 config_flow,
                 "get_midea_cloud",
                 return_value=cloud,
             ) as get_cloud,
-            patch.object(config_flow, "_validate_candidate", return_value=True),
+            patch.object(
+                config_flow,
+                "_async_validate_candidate",
+                AsyncMock(return_value=True),
+            ),
         ):
             candidates = await flow._async_cloud_candidates(
                 "owner@example.invalid",
@@ -715,7 +783,11 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
 
     async def test_manual_flow_preserves_selected_device_type(self) -> None:
         flow = self._flow()
-        with patch.object(config_flow, "_validate_candidate", return_value=True):
+        with patch.object(
+            config_flow,
+            "_async_validate_candidate",
+            AsyncMock(return_value=True),
+        ):
             result = await flow.async_step_manual(
                 {
                     CONF_DEVICE_ID: 654321,
@@ -929,6 +1001,32 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
         )
         device.set_attribute.assert_not_called()
         await coordinator.async_shutdown()
+
+    async def test_setup_with_real_async_device(self) -> None:
+        """Set up a real midea-local 15 device object with mocked transport."""
+        if not ASYNC_LIBRARY:
+            self.skipTest("installed midea-local uses the threaded API")
+        entry = self._entry(self._candidate())
+        device = create_integration_device(self._candidate())
+        self.assertIsNotNone(device)
+        device.connect = AsyncMock(return_value=True)
+        device.open = AsyncMock()
+        device.close = AsyncMock()
+        device.close_socket = AsyncMock()
+        self.hass.config_entries.async_forward_entry_setups = AsyncMock()
+        self.hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+        with patch(
+            "custom_components.comfee_dishwasher._create_device",
+            return_value=device,
+        ):
+            self.assertTrue(await async_setup_entry(self.hass, entry))
+            self.assertTrue(await async_unload_entry(self.hass, entry))
+            await entry._async_process_on_unload(self.hass)
+            await self.hass.async_block_till_done()
+        device.connect.assert_awaited_once_with(check_protocol=True)
+        device.open.assert_awaited_once_with()
+        device.close.assert_awaited_once_with()
+        device.close_socket.assert_awaited_with()
 
     async def test_setup_and_unload_close_socket(self) -> None:
         entry = ConfigEntry(
@@ -1402,12 +1500,12 @@ class ComponentRuntimeTests(IsolatedAsyncioTestCase):
                 return_value=device,
             ),
             patch(
-                "custom_components.comfee_dishwasher._connect_device",
-                side_effect=[False, True],
+                "custom_components.comfee_dishwasher._async_connect_device",
+                AsyncMock(side_effect=[False, True]),
             ),
             patch(
-                "custom_components.comfee_dishwasher._discover_current_ip",
-                return_value="192.0.2.20",
+                "custom_components.comfee_dishwasher._async_discover_current_ip",
+                AsyncMock(return_value="192.0.2.20"),
             ),
         ):
             self.assertTrue(await async_setup_entry(self.hass, entry))

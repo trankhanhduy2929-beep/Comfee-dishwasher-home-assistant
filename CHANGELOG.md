@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.0 — 2026-11-06
+
+- Fix the Home Assistant 2026.11 setup error
+  `TypeError: device_selector() got an unexpected keyword argument 'customize'`.
+  `midea-local 15.0.0` removed that argument, so it is now only passed when the
+  installed selector signature accepts it.
+- Support both library generations: threaded `midea-local` 11.x–14.x and the
+  asyncio API introduced in 15.x. Connect, discovery, open, refresh, commands,
+  reconnect and teardown are routed through a compatibility layer.
+- Keep `midea-local>=11.0.1` without an exact pin, so the integration accepts
+  Home Assistant 2026.11's core pin (`15.0.0`) and older supported releases.
+- Add regression tests for the selector signature, async method awaiting and
+  the full 49-test contract/runtime suite on `midea-local` 11.0.1, 12.2.0 and
+  15.0.0, including a real Home Assistant 2026.11.0 runtime.
+- Adjust the driver profile check for capability-gated AC attributes that are
+  only exposed after the appliance reports its capabilities.
+
 ## 0.7.0 — 2026-10-06
 
 - Fix the Hassfest failure reported for `5b64875`: require `midea-local>=11.0.1`

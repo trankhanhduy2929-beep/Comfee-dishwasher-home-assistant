@@ -1,5 +1,6 @@
 """State and command coordination for a supported local appliance."""
 
+import inspect
 import logging
 from collections.abc import Callable, Mapping
 from datetime import datetime
@@ -15,6 +16,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from midealocal.device import MideaDevice
 from midealocal.devices.e1 import MideaE1Device
 
+from .compat import ASYNC_LIBRARY, async_call
 from .const import DOMAIN
 from .device_profiles import get_device_profile, writable_attributes_for
 from .usage import DishwasherUsageTracker
@@ -25,7 +27,7 @@ _MAX_PENDING_USAGE_UPDATES = 64
 
 
 class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Bridge one local Midea-family device thread to Home Assistant safely."""
+    """Bridge one local Midea-family device to Home Assistant safely."""
 
     def __init__(
         self,
@@ -100,7 +102,8 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             self.device.register_update(self._device_update_callback)
             self._callback_registered = True
-            self.device.daemon = True
+            if not ASYNC_LIBRARY:
+                self.device.daemon = True
             if self.usage is not None:
                 self._remove_usage_rollover = async_track_time_change(
                     self.hass,
@@ -109,7 +112,7 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     minute=0,
                     second=0,
                 )
-            await self.hass.async_add_executor_job(self.device.open)
+            await async_call(self.hass, self.device.open)
         except Exception:
             if self._callback_registered:
                 self.device.unregister_update(self._device_update_callback)
@@ -251,14 +254,27 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return False
 
     async def async_request_device_refresh(self) -> None:
-        """Ask the local service thread for a fresh read-only state."""
+        """Ask the local device for a fresh read-only state."""
         try:
-            await self.hass.async_add_executor_job(self._request_refresh_blocking)
+            if ASYNC_LIBRARY:
+                await self._async_request_refresh()
+            else:
+                await self.hass.async_add_executor_job(self._request_refresh_blocking)
         except Exception as error:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="local_connection_failed",
             ) from error
+
+    async def _async_request_refresh(self) -> None:
+        """Send one query through the asyncio device implementation."""
+        if self._closing or not self.device.available:
+            raise OSError("device is unavailable")
+        try:
+            await async_call(self.hass, self.device.refresh_status)
+        except Exception:
+            await self._async_mark_unavailable()
+            raise
 
     def _request_refresh_blocking(self) -> None:
         """Send one query while leaving socket reads to the service thread."""
@@ -330,9 +346,14 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
     async def async_reconnect(self) -> None:
-        """Reset the socket so the local service thread reconnects it."""
+        """Reset the socket so the driver reconnects it."""
         try:
-            await self.hass.async_add_executor_job(self._reconnect_blocking)
+            if ASYNC_LIBRARY:
+                if self._closing:
+                    raise OSError("coordinator is closing")
+                await self._async_mark_unavailable()
+            else:
+                await self.hass.async_add_executor_job(self._reconnect_blocking)
         except Exception as error:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
@@ -349,13 +370,16 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_command(
         self, command: Callable[..., Any], *arguments: Any
     ) -> None:
-        """Run one local command outside the Home Assistant event loop."""
+        """Run one local command against either library API."""
         try:
-            await self.hass.async_add_executor_job(
-                self._command_blocking,
-                command,
-                arguments,
-            )
+            if ASYNC_LIBRARY:
+                await self._async_command_loop(command, arguments)
+            else:
+                await self.hass.async_add_executor_job(
+                    self._command_blocking,
+                    command,
+                    arguments,
+                )
         except HomeAssistantError:
             raise
         except Exception as error:
@@ -363,6 +387,22 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 translation_domain=DOMAIN,
                 translation_key="command_failed",
             ) from error
+
+    async def _async_command_loop(
+        self,
+        command: Callable[..., Any],
+        arguments: tuple[Any, ...],
+    ) -> None:
+        """Send a command through the asyncio device implementation."""
+        if self._closing or not self.device.available:
+            raise OSError("device is unavailable")
+        try:
+            result = command(*arguments)
+            if inspect.isawaitable(result):
+                await result
+        except Exception:
+            await self._async_mark_unavailable()
+            raise
 
     def _command_blocking(
         self,
@@ -384,6 +424,11 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.device.close_socket()
         self.device.set_available(False)
 
+    async def _async_mark_unavailable(self) -> None:
+        """Close the asyncio socket and publish disconnected state."""
+        await async_call(self.hass, self.device.close_socket)
+        self.device.set_available(False)
+
     async def async_close(self) -> None:
         """Detach callbacks and stop local networking without blocking HA."""
         with self._pending_lock:
@@ -401,7 +446,17 @@ class ComfeeDishwasherCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.usage is not None:
             await self.usage.async_shutdown()
         await self.async_shutdown()
-        await self.hass.async_add_executor_job(self.close)
+        if ASYNC_LIBRARY:
+            await self._async_close_device()
+        else:
+            await self.hass.async_add_executor_job(self.close)
+
+    async def _async_close_device(self) -> None:
+        """Stop the asyncio device tasks and close the local socket."""
+        try:
+            await async_call(self.hass, self.device.close)
+        finally:
+            await async_call(self.hass, self.device.close_socket)
 
     def close(self) -> None:
         """Stop the service thread and close the local socket."""

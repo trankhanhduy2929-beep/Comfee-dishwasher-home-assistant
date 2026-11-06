@@ -1,7 +1,8 @@
 # Comfee / Midea Local Appliances
 
 Custom integration cho Home Assistant, kết nối thiết bị thuộc hệ sinh thái
-Midea bằng giao thức LAN của `midea-local >= 11.0.1`.
+Midea bằng giao thức LAN của `midea-local >= 11.0.1`, tương thích cả API
+thread (11.x–14.x) và API asyncio (15.x trở lên).
 
 - Giữ domain `comfee_dishwasher` để tương thích cấu hình Comfee E1 cũ.
 - Hỗ trợ discovery cho 36 loại driver: điều hòa, quạt, lọc khí, hút ẩm, tạo
@@ -13,8 +14,9 @@ Midea bằng giao thức LAN của `midea-local >= 11.0.1`.
   cho cùng một thiết bị.
 - Cloud chỉ dùng trong config flow; tài khoản và mật khẩu không được lưu.
 - Sau khi cấu hình, trạng thái và lệnh đã cho phép đi trực tiếp qua LAN.
-- Một thread nền trên mỗi thiết bị nhận thông báo và truy vấn dự phòng. Callback
-  được gộp trước khi cập nhật entity để tránh làm nặng Home Assistant.
+- Driver nhận thông báo và truy vấn dự phòng: thread nền với `midea-local` cũ,
+  asyncio task với `midea-local 15.x`. Callback được gộp trước khi cập nhật
+  entity để tránh làm nặng Home Assistant.
 - Thiết bị ngoài E1 dùng sensor/binary sensor generic. Thuộc tính chẩn đoán hiếm
   bị disable mặc định để giảm dữ liệu Recorder.
 - Chỉ thuộc tính boolean trong allow-list của đúng driver mới được tạo switch;

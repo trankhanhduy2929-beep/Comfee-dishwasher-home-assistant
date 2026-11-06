@@ -1,5 +1,6 @@
 """Comfee/Midea-family integration using the Midea local protocol."""
 
+import logging
 from collections.abc import Mapping
 from typing import Any
 
@@ -22,6 +23,7 @@ from midealocal.device import MideaDevice
 from midealocal.devices import device_selector
 from midealocal.discover import discover
 
+from .compat import async_call, selector_kwargs
 from .const import (
     CONF_KEY,
     CONF_MAC,
@@ -30,6 +32,8 @@ from .const import (
 )
 from .coordinator import ComfeeDishwasherCoordinator
 from .device_profiles import profile_name
+
+_LOGGER = logging.getLogger(__package__)
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -43,33 +47,46 @@ PLATFORMS: list[Platform] = [
 def _create_device(data: Mapping[str, Any]) -> MideaDevice | None:
     """Create the selected Midea-family device implementation."""
     return device_selector(
-        name=data[CONF_NAME],
-        device_id=data[CONF_DEVICE_ID],
-        device_type=data[CONF_TYPE],
-        ip_address=data[CONF_IP_ADDRESS],
-        port=data[CONF_PORT],
-        token=data[CONF_TOKEN],
-        key=data[CONF_KEY],
-        device_protocol=ProtocolVersion(data[CONF_PROTOCOL]),
-        model=data[CONF_MODEL],
-        subtype=data.get(CONF_SUBTYPE, 0),
-        customize="",
-        mac=data.get(CONF_MAC),
-        serial_number=data.get(CONF_SERIAL_NUMBER),
+        **selector_kwargs(
+            {
+                "name": data[CONF_NAME],
+                "device_id": data[CONF_DEVICE_ID],
+                "device_type": data[CONF_TYPE],
+                "ip_address": data[CONF_IP_ADDRESS],
+                "port": data[CONF_PORT],
+                "token": data[CONF_TOKEN],
+                "key": data[CONF_KEY],
+                "device_protocol": ProtocolVersion(data[CONF_PROTOCOL]),
+                "model": data[CONF_MODEL],
+                "subtype": data.get(CONF_SUBTYPE, 0),
+                "mac": data.get(CONF_MAC),
+                "serial_number": data.get(CONF_SERIAL_NUMBER),
+            },
+        ),
     )
 
 
-def _connect_device(device: MideaDevice) -> bool:
-    """Connect to the device and close any failed socket."""
-    connected = device.connect(check_protocol=True)
+async def _async_connect_device(
+    hass: HomeAssistant,
+    device: MideaDevice,
+) -> bool:
+    """Connect and close any failed socket on either library API."""
+    try:
+        connected = bool(await async_call(hass, device.connect, check_protocol=True))
+    except Exception:
+        _LOGGER.debug("Initial dishwasher connection failed", exc_info=True)
+        connected = False
     if not connected:
-        device.close_socket()
+        await async_call(hass, device.close_socket)
     return connected
 
 
-def _discover_current_ip(device_id: int) -> str | None:
+async def _async_discover_current_ip(
+    hass: HomeAssistant,
+    device_id: int,
+) -> str | None:
     """Find the current address of a configured local appliance."""
-    info = discover().get(device_id)
+    info = (await async_call(hass, discover)).get(device_id)
     if info is None:
         return None
     ip_address = info.get(CONF_IP_ADDRESS)
@@ -80,21 +97,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up a Comfee/Midea-family local appliance config entry."""
     data = dict(entry.data)
     device_type = int(data.get(CONF_TYPE, 0xE1))
-    device = await hass.async_add_executor_job(_create_device, data)
+    device = await async_call(hass, _create_device, data)
     if device is None:
         raise ConfigEntryError(
             f"No local driver is available for {profile_name(device_type, vietnamese=False)}"
         )
 
-    connected = await hass.async_add_executor_job(_connect_device, device)
+    connected = await _async_connect_device(hass, device)
     if not connected:
-        current_ip = await hass.async_add_executor_job(
-            _discover_current_ip,
+        current_ip = await _async_discover_current_ip(
+            hass,
             int(data[CONF_DEVICE_ID]),
         )
         if current_ip and current_ip != data[CONF_IP_ADDRESS]:
-            await hass.async_add_executor_job(device.set_ip_address, current_ip)
-            connected = await hass.async_add_executor_job(_connect_device, device)
+            await async_call(hass, device.set_ip_address, current_ip)
+            connected = await _async_connect_device(hass, device)
             if connected:
                 data[CONF_IP_ADDRESS] = current_ip
                 hass.config_entries.async_update_entry(entry, data=data)

@@ -16,13 +16,16 @@ from homeassistant.const import (
     CONF_TOKEN,
     CONF_TYPE,
 )
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from midealocal.cloud import SUPPORTED_CLOUDS, get_midea_cloud
 from midealocal.const import ProtocolVersion
+from midealocal.device import MideaDevice
 from midealocal.devices import device_selector
 from midealocal.discover import discover
 from midealocal.exceptions import MideaCloudError
 
+from .compat import async_call, selector_kwargs
 from .const import (
     CONF_ACCOUNT,
     CONF_BRAND,
@@ -199,10 +202,7 @@ class ComfeeDishwasherConfigFlow(ConfigFlow, domain=DOMAIN):
                     user_input.get(CONF_MANUFACTURER_CODE) or "",
                 ).strip(),
             }
-            connected = await self.hass.async_add_executor_job(
-                _validate_candidate,
-                candidate,
-            )
+            connected = await _async_validate_candidate(self.hass, candidate)
             if not connected:
                 return self._show_manual_form(user_input, "manual_auth_failed")
             return await self._async_create_entry(candidate)
@@ -297,10 +297,7 @@ class ComfeeDishwasherConfigFlow(ConfigFlow, domain=DOMAIN):
         cloud_name: str = DEFAULT_CLOUD_NAME,
     ) -> list[dict[str, Any]]:
         """Discover local drivers and validate cloud-provided keys."""
-        local_devices = await self.hass.async_add_executor_job(
-            _discover_devices,
-            ip_address,
-        )
+        local_devices = await _async_discover_devices(self.hass, ip_address)
         local_supported = [
             (device_id, info)
             for device_id, info in local_devices.items()
@@ -364,10 +361,7 @@ class ComfeeDishwasherConfigFlow(ConfigFlow, domain=DOMAIN):
                         appliance.get("manufacturer_code") or "",
                     ),
                 }
-                connected = await self.hass.async_add_executor_job(
-                    _validate_candidate,
-                    candidate,
-                )
+                connected = await _async_validate_candidate(self.hass, candidate)
                 if connected:
                     candidates.append(candidate)
                     break
@@ -442,9 +436,12 @@ class DeviceNotInAccountError(Exception):
     """A discovered device is not present in the cloud account."""
 
 
-def _discover_devices(ip_address: str | None) -> dict[int, dict[str, Any]]:
-    """Run the blocking local discovery operation."""
-    return discover(ip_address=ip_address)
+async def _async_discover_devices(
+    hass: HomeAssistant,
+    ip_address: str | None,
+) -> dict[int, dict[str, Any]]:
+    """Run local discovery on either library API."""
+    return await async_call(hass, discover, ip_address=ip_address)
 
 
 def _lookup_appliance(
@@ -479,31 +476,44 @@ def _normalize_hex_credential(value: Any) -> str:
     return decoded.hex()
 
 
-def _validate_candidate(candidate: dict[str, Any]) -> bool:
+def _create_candidate_device(candidate: dict[str, Any]) -> MideaDevice | None:
+    """Create a device for candidate validation on either library API."""
+    return device_selector(
+        **selector_kwargs(
+            {
+                "name": str(candidate[CONF_NAME]),
+                "device_id": int(candidate[CONF_DEVICE_ID]),
+                "device_type": int(candidate[CONF_TYPE]),
+                "ip_address": str(candidate[CONF_IP_ADDRESS]),
+                "port": int(candidate[CONF_PORT]),
+                "token": str(candidate[CONF_TOKEN]),
+                "key": str(candidate[CONF_KEY]),
+                "device_protocol": ProtocolVersion(int(candidate[CONF_PROTOCOL])),
+                "model": str(candidate[CONF_MODEL]),
+                "subtype": int(candidate.get(CONF_SUBTYPE, 0)),
+                "mac": candidate.get(CONF_MAC),
+                "serial_number": candidate.get(CONF_SERIAL_NUMBER),
+            },
+        ),
+    )
+
+
+async def _async_validate_candidate(
+    hass: HomeAssistant,
+    candidate: dict[str, Any],
+) -> bool:
     """Authenticate and query a candidate without sending a control command."""
     device = None
     try:
         if get_device_profile(candidate.get(CONF_TYPE)) is None:
             return False
-        device = device_selector(
-            name=str(candidate[CONF_NAME]),
-            device_id=int(candidate[CONF_DEVICE_ID]),
-            device_type=int(candidate[CONF_TYPE]),
-            ip_address=str(candidate[CONF_IP_ADDRESS]),
-            port=int(candidate[CONF_PORT]),
-            token=str(candidate[CONF_TOKEN]),
-            key=str(candidate[CONF_KEY]),
-            device_protocol=ProtocolVersion(int(candidate[CONF_PROTOCOL])),
-            model=str(candidate[CONF_MODEL]),
-            subtype=int(candidate.get(CONF_SUBTYPE, 0)),
-            customize="",
-            mac=candidate.get(CONF_MAC),
-            serial_number=candidate.get(CONF_SERIAL_NUMBER),
-        )
-        return bool(device and device.connect(check_protocol=True))
+        device = await async_call(hass, _create_candidate_device, candidate)
+        if device is None:
+            return False
+        return bool(await async_call(hass, device.connect, check_protocol=True))
     except Exception:
         _LOGGER.debug("Unable to validate local appliance credentials", exc_info=True)
         return False
     finally:
         if device is not None:
-            device.close_socket()
+            await async_call(hass, device.close_socket)

@@ -8,10 +8,11 @@
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=trankhanhduy2929-beep&repository=Comfee-dishwasher-home-assistant&category=integration)
 
 Custom integration không chính thức để kết nối thiết bị thuộc hệ sinh thái
-Midea với Home Assistant qua mạng nội bộ. Bản `0.7.0` giữ nguyên domain
+Midea với Home Assistant qua mạng nội bộ. Bản `0.8.0` giữ nguyên domain
 `comfee_dishwasher` để không làm mất cấu hình máy rửa bát Comfee hiện có, đồng
 thời mở rộng discovery và đọc trạng thái cho toàn bộ 36 driver có sẵn trong
-`midea-local >= 11.0.1`.
+`midea-local >= 11.0.1`, tương thích cả API thread cũ và API asyncio của
+`midea-local 15.x` mà Home Assistant 2026.11 sử dụng.
 
 Tài khoản cloud chỉ được dùng trong bước cấu hình để lấy token/key LAN. Sau khi
 thêm thiết bị, Home Assistant đọc trạng thái và gửi các lệnh đã cho phép trực
@@ -113,7 +114,7 @@ kết nối sai.
 
 ## Loại thiết bị
 
-Catalog `0.7.0` có 36 loại driver LAN:
+Catalog `0.8.0` có 36 loại driver LAN:
 
 | Nhóm | Mã loại và thiết bị |
 | --- | --- |
@@ -145,14 +146,18 @@ firmware và app/cloud đã dùng để đăng ký thiết bị.
 ## Kiến trúc mạng
 
 - Cloud chỉ được gọi lúc thêm integration để lấy token/key LAN.
-- Mỗi thiết bị dùng một thread nền của `midea-local` để giữ kết nối TCP cục bộ,
-  thường ở cổng `6444`.
+- Với `midea-local` 11.x–14.x, mỗi thiết bị dùng một thread nền để giữ kết nối
+  TCP cục bộ, thường ở cổng `6444`.
+- Với `midea-local` 15.x trở lên, driver dùng asyncio task; integration chạy
+  connect, discovery, open, refresh, command, reconnect và teardown trực tiếp
+  trên event loop theo API mới.
 - Thông báo LAN được đưa vào hàng đợi ngắn, gộp các thay đổi liên tiếp rồi cập
   nhật Home Assistant trên event loop. Cách này giữ cập nhật gần thời gian thực
   nhưng tránh tạo quá nhiều state/event.
 - Truy vấn local định kỳ của driver được giữ làm dự phòng cho firmware không
   chủ động phát mọi thay đổi.
-- Connect, refresh, reconnect, command và teardown đều chạy ngoài event loop.
+- Ở API thread cũ, connect/refresh/reconnect/command/teardown chạy ngoài event
+  loop; ở API asyncio mới, chúng là coroutine do driver quản lý.
 - Home Assistant và thiết bị phải liên lạc được trong cùng LAN/VLAN. Client
   isolation hoặc firewall có thể chặn discovery và TCP local.
 - Sau khi cấu hình, integration có thể hoạt động khi mất Internet nếu LAN và
